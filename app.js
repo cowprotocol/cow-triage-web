@@ -5,8 +5,8 @@
   var TOKEN_KEY = "cow-web-dashboard-token-v1";
   var FIRST_RUN_NOTICE_KEY = "cow-web-dashboard-first-run-notice-dismissed-v1";
   var ORG_OWNER = "cowprotocol";
-  var REFRESH_INTERVAL_MINUTES = 15;
-  var REFRESH_INTERVAL_MS = REFRESH_INTERVAL_MINUTES * 60 * 1000;
+  var DEFAULT_AUTO_REFRESH_MINUTES = 15;
+  var AUTO_REFRESH_MINUTE_OPTIONS = [0, 5, 10, 15, 30, 60];
   var WEEK_MS = 7 * 24 * 60 * 60 * 1000;
   var TWO_WEEKS_MS = 2 * WEEK_MS;
   var STALE_AFTER_MS = 3 * 24 * 60 * 60 * 1000;
@@ -15,7 +15,9 @@
     repo: "cowswap",
     reviewerFilter: "all",
     statusFilter: "all",
+    ageFilter: "all",
     sortMode: "priority",
+    autoRefreshMinutes: DEFAULT_AUTO_REFRESH_MINUTES,
     hideDrafts: true
   };
 
@@ -25,10 +27,12 @@
     reposLoading: false,
     reposError: "",
     repoRequestId: 0,
+    reviewerFilterOptions: [],
     pulls: [],
     loading: false,
     lastUpdated: null,
-    dashboardRequestId: 0
+    dashboardRequestId: 0,
+    refreshTimerId: null
   };
 
   var els = {
@@ -36,18 +40,34 @@
     boardScrollTop: document.getElementById("boardScrollTop"),
     boardScrollTopInner: document.getElementById("boardScrollTopInner"),
     boardMeta: document.getElementById("boardMeta"),
+    ageFilterButtons: document.querySelectorAll("[data-age-filter]"),
+    draftAgeLegend: document.getElementById("draftAgeLegend"),
     firstRunNotice: document.getElementById("firstRunNotice"),
     noticeSettingsButton: document.getElementById("noticeSettingsButton"),
     noticeDismissButton: document.getElementById("noticeDismissButton"),
     message: document.getElementById("message"),
     repoSelect: document.getElementById("repoSelect"),
+    repoCombobox: document.getElementById("repoCombobox"),
+    repoSelectButton: document.getElementById("repoSelectButton"),
+    repoSelectLabel: document.getElementById("repoSelectLabel"),
+    repoSelectMenu: document.getElementById("repoSelectMenu"),
+    repoSearchInput: document.getElementById("repoSearchInput"),
+    repoOptions: document.getElementById("repoOptions"),
     repoPickerHint: document.getElementById("repoPickerHint"),
     reviewerFilterSelect: document.getElementById("reviewerFilterSelect"),
+    reviewerFilterCombobox: document.getElementById("reviewerFilterCombobox"),
+    reviewerFilterButton: document.getElementById("reviewerFilterButton"),
+    reviewerFilterLabel: document.getElementById("reviewerFilterLabel"),
+    reviewerFilterMenu: document.getElementById("reviewerFilterMenu"),
+    reviewerFilterSearchInput: document.getElementById("reviewerFilterSearchInput"),
+    reviewerFilterOptions: document.getElementById("reviewerFilterOptions"),
     statusFilterSelect: document.getElementById("statusFilterSelect"),
     sortSelect: document.getElementById("sortSelect"),
+    clearFiltersButton: document.getElementById("clearFiltersButton"),
     settingsMenu: document.getElementById("settingsMenu"),
     settingsCloseButton: document.getElementById("settingsCloseButton"),
     hideDraftsInput: document.getElementById("hideDraftsInput"),
+    autoRefreshSelect: document.getElementById("autoRefreshSelect"),
     tokenInput: document.getElementById("tokenInput"),
     tokenVisibilityButton: document.getElementById("tokenVisibilityButton"),
     tokenSaveButton: document.getElementById("tokenSaveButton"),
@@ -55,7 +75,9 @@
     statusPill: document.getElementById("statusPill"),
     openPrCount: document.getElementById("openPrCount"),
     assignmentCount: document.getElementById("assignmentCount"),
-    activeReviewerCount: document.getElementById("activeReviewerCount"),
+    agingMetric: document.getElementById("agingMetric"),
+    agingBadge: document.getElementById("agingBadge"),
+    agingReviewCount: document.getElementById("agingReviewCount"),
     unassignedMetric: document.getElementById("unassignedMetric"),
     unassignedBadge: document.getElementById("unassignedBadge"),
     unassignedCount: document.getElementById("unassignedCount")
@@ -64,12 +86,13 @@
   hydrateForm();
   bindEvents();
   bindBoardScroll();
+  syncShareUrlParams(state.config);
   renderFirstRunNotice();
   renderRepoOptions();
   render();
   refreshRepositories();
   refreshDashboard();
-  window.setInterval(refreshDashboard, REFRESH_INTERVAL_MS);
+  configureAutoRefresh();
 
   function bindEvents() {
     els.refreshButton.addEventListener("click", function () {
@@ -77,24 +100,49 @@
       saveConfig(state.config);
       saveToken(els.tokenInput.value);
       updateTokenSaveState();
+      configureAutoRefresh();
       refreshRepositories();
       refreshDashboard();
     });
 
-    els.repoSelect.addEventListener("change", function () {
-      state.config = readForm();
-      state.config.reviewerFilter = "all";
-      state.pulls = [];
-      state.lastUpdated = null;
-      saveConfig(state.config);
-      render();
-      refreshDashboard();
+    els.repoSelectButton.addEventListener("click", function () {
+      toggleSearchSelect("repo");
+    });
+    els.repoSearchInput.addEventListener("input", renderRepoMenuOptions);
+    els.repoSearchInput.addEventListener("keydown", function (event) {
+      handleMenuSearchKeydown(event, "repo");
+    });
+    els.repoOptions.addEventListener("click", function (event) {
+      var option = event.target.closest("[data-value]");
+      if (option) {
+        selectRepo(option.getAttribute("data-value"));
+      }
     });
 
-    els.reviewerFilterSelect.addEventListener("change", function () {
-      state.config.reviewerFilter = els.reviewerFilterSelect.value;
-      saveConfig(state.config);
-      render();
+    els.reviewerFilterButton.addEventListener("click", function () {
+      toggleSearchSelect("reviewer");
+    });
+    els.reviewerFilterSearchInput.addEventListener("input", renderReviewerFilterMenuOptions);
+    els.reviewerFilterSearchInput.addEventListener("keydown", function (event) {
+      handleMenuSearchKeydown(event, "reviewer");
+    });
+    els.reviewerFilterOptions.addEventListener("click", function (event) {
+      var option = event.target.closest("[data-value]");
+      if (option) {
+        selectReviewerFilter(option.getAttribute("data-value"));
+      }
+    });
+
+    document.addEventListener("click", function (event) {
+      if (!els.repoCombobox.contains(event.target)) {
+        closeSearchSelect("repo");
+      }
+      if (!els.reviewerFilterCombobox.contains(event.target)) {
+        closeSearchSelect("reviewer");
+      }
+      if (els.settingsMenu.open && !els.settingsMenu.contains(event.target)) {
+        els.settingsMenu.open = false;
+      }
     });
 
     els.statusFilterSelect.addEventListener("change", function () {
@@ -109,13 +157,51 @@
       render();
     });
 
+    els.ageFilterButtons.forEach(function (button) {
+      button.addEventListener("click", function () {
+        var nextFilter = normalizeAgeFilter(button.getAttribute("data-age-filter"));
+        state.config.ageFilter = state.config.ageFilter === nextFilter ? "all" : nextFilter;
+        saveConfig(state.config);
+        render();
+      });
+    });
+
+    els.clearFiltersButton.addEventListener("click", function () {
+      state.config.reviewerFilter = "all";
+      state.config.statusFilter = "all";
+      state.config.ageFilter = "all";
+      saveConfig(state.config);
+      render();
+    });
+
+    bindMetricShortcut(els.agingMetric, function () {
+      state.config.ageFilter = "red";
+      saveConfig(state.config);
+      render();
+    });
+
+    bindMetricShortcut(els.unassignedMetric, function () {
+      state.config.reviewerFilter = "unassigned";
+      saveConfig(state.config);
+      render();
+    });
+
     els.hideDraftsInput.addEventListener("change", function () {
       state.config.hideDrafts = els.hideDraftsInput.checked;
       if (state.config.hideDrafts && state.config.statusFilter === "draft") {
         state.config.statusFilter = "all";
       }
+      if (state.config.hideDrafts && state.config.ageFilter === "draft") {
+        state.config.ageFilter = "all";
+      }
       saveConfig(state.config);
       render();
+    });
+
+    els.autoRefreshSelect.addEventListener("change", function () {
+      state.config.autoRefreshMinutes = normalizeAutoRefreshMinutes(els.autoRefreshSelect.value);
+      saveConfig(state.config);
+      configureAutoRefresh();
     });
 
     els.settingsCloseButton.addEventListener("click", function () {
@@ -138,7 +224,8 @@
       refreshDashboard();
     });
 
-    els.noticeSettingsButton.addEventListener("click", function () {
+    els.noticeSettingsButton.addEventListener("click", function (event) {
+      event.stopPropagation();
       openSettings();
     });
 
@@ -146,6 +233,120 @@
       writeStorage(window.localStorage, FIRST_RUN_NOTICE_KEY, "1");
       renderFirstRunNotice();
     });
+  }
+
+  function bindMetricShortcut(element, callback) {
+    element.addEventListener("click", callback);
+    element.addEventListener("keydown", function (event) {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        callback();
+      }
+    });
+  }
+
+  function toggleSearchSelect(kind) {
+    var parts = getSearchSelectParts(kind);
+    if (parts.menu.hidden) {
+      openSearchSelect(kind);
+    } else {
+      closeSearchSelect(kind);
+    }
+  }
+
+  function openSearchSelect(kind) {
+    var parts = getSearchSelectParts(kind);
+    closeSearchSelect(kind === "repo" ? "reviewer" : "repo");
+    parts.menu.hidden = false;
+    parts.button.setAttribute("aria-expanded", "true");
+    parts.combobox.classList.add("is-open");
+    parts.search.value = "";
+    if (kind === "repo") {
+      renderRepoMenuOptions();
+    } else {
+      renderReviewerFilterMenuOptions();
+    }
+    window.setTimeout(function () {
+      parts.search.focus();
+    }, 0);
+  }
+
+  function closeSearchSelect(kind) {
+    var parts = getSearchSelectParts(kind);
+    if (parts.menu.hidden) {
+      return;
+    }
+    parts.menu.hidden = true;
+    parts.button.setAttribute("aria-expanded", "false");
+    parts.combobox.classList.remove("is-open");
+    parts.search.value = "";
+  }
+
+  function handleMenuSearchKeydown(event, kind) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeSearchSelect(kind);
+      getSearchSelectParts(kind).button.focus();
+      return;
+    }
+
+    if (event.key === "Enter") {
+      var firstOption = getSearchSelectParts(kind).options.querySelector(".search-select-option");
+      if (firstOption) {
+        event.preventDefault();
+        firstOption.click();
+      }
+    }
+  }
+
+  function getSearchSelectParts(kind) {
+    if (kind === "repo") {
+      return {
+        combobox: els.repoCombobox,
+        button: els.repoSelectButton,
+        menu: els.repoSelectMenu,
+        search: els.repoSearchInput,
+        options: els.repoOptions
+      };
+    }
+
+    return {
+      combobox: els.reviewerFilterCombobox,
+      button: els.reviewerFilterButton,
+      menu: els.reviewerFilterMenu,
+      search: els.reviewerFilterSearchInput,
+      options: els.reviewerFilterOptions
+    };
+  }
+
+  function selectRepo(value) {
+    var nextRepo = resolveRepoValue(value);
+    els.repoSelect.value = nextRepo;
+    closeSearchSelect("repo");
+
+    if (nextRepo === state.config.repo) {
+      syncShareUrlParams(state.config);
+      renderRepoOptions();
+      return;
+    }
+
+    state.config = readForm();
+    state.config.repo = nextRepo;
+    state.config.reviewerFilter = "all";
+    state.pulls = [];
+    state.lastUpdated = null;
+    saveConfig(state.config);
+    render();
+    refreshDashboard();
+  }
+
+  function selectReviewerFilter(value) {
+    var nextFilter = normalizeFilterValue(value);
+    els.reviewerFilterSelect.value = nextFilter;
+    closeSearchSelect("reviewer");
+    state.config.reviewerFilter = nextFilter;
+    saveConfig(state.config);
+    render();
   }
 
   function renderFirstRunNotice() {
@@ -181,19 +382,93 @@
     try {
       var saved = JSON.parse(readStorage(window.localStorage, CONFIG_KEY) || "{}");
       var config = Object.assign({}, defaults, saved);
-      return {
-        repo: cleanRepoPart(config.repo || defaults.repo) || defaults.repo,
-        reviewerFilter: normalizeFilterValue(config.reviewerFilter),
-        statusFilter: normalizeStatusFilter(config.statusFilter),
-        sortMode: normalizeSortMode(config.sortMode),
-        hideDrafts: config.hideDrafts !== false
-      };
+      return applyUrlConfigOverrides(config);
     } catch (_error) {
-      return Object.assign({}, defaults);
+      return applyUrlConfigOverrides(Object.assign({}, defaults));
     }
   }
 
+  function applyUrlConfigOverrides(config) {
+    var repoFromUrl = getRepoFromUrl();
+    var targetFromUrl = getUrlParam("target");
+    var statusFromUrl = getUrlParam("status");
+    var ageFromUrl = getUrlParam("age");
+    var sortFromUrl = getUrlParam("sort");
+    var draftsFromUrl = getUrlParam("drafts");
+    var hideDrafts = config.hideDrafts !== false;
+
+    if (draftsFromUrl !== null) {
+      var draftVisibility = normalizeDraftVisibility(draftsFromUrl);
+      if (draftVisibility !== null) {
+        hideDrafts = draftVisibility;
+      }
+    }
+    var statusFilter = statusFromUrl !== null
+      ? normalizeStatusFilter(statusFromUrl)
+      : normalizeStatusFilter(config.statusFilter);
+    var ageFilter = ageFromUrl !== null
+      ? normalizeAgeFilter(ageFromUrl)
+      : normalizeAgeFilter(config.ageFilter);
+    if (hideDrafts && statusFilter === "draft") {
+      statusFilter = "all";
+    }
+    if (hideDrafts && ageFilter === "draft") {
+      ageFilter = "all";
+    }
+
+    return {
+      repo: repoFromUrl || cleanRepoPart(config.repo || defaults.repo) || defaults.repo,
+      reviewerFilter: targetFromUrl !== null ? normalizeFilterValue(targetFromUrl) : normalizeFilterValue(config.reviewerFilter),
+      statusFilter: statusFilter,
+      ageFilter: ageFilter,
+      sortMode: sortFromUrl !== null ? normalizeSortMode(sortFromUrl) : normalizeSortMode(config.sortMode),
+      autoRefreshMinutes: normalizeAutoRefreshMinutes(config.autoRefreshMinutes),
+      hideDrafts: hideDrafts
+    };
+  }
+
+  function getUrlParam(name) {
+    try {
+      var params = new URLSearchParams(window.location.search);
+      return params.has(name) ? params.get(name) : null;
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function getRepoFromUrl() {
+    return cleanRepoPart(getUrlParam("repo") || getUrlParam("repository") || "");
+  }
+
+  function syncShareUrlParams(config) {
+    try {
+      var url = new URL(window.location.href);
+      var cleanRepo = cleanRepoPart(config.repo) || defaults.repo;
+      setOptionalUrlParam(url, "target", normalizeFilterValue(config.reviewerFilter), "all");
+      setOptionalUrlParam(url, "status", normalizeStatusFilter(config.statusFilter), "all");
+      setOptionalUrlParam(url, "age", normalizeAgeFilter(config.ageFilter), "all");
+      url.searchParams.set("repo", cleanRepo);
+      url.searchParams.set("sort", normalizeSortMode(config.sortMode));
+      url.searchParams.set("drafts", config.hideDrafts === false ? "show" : "hide");
+      url.searchParams.delete("repository");
+      if (url.href !== window.location.href) {
+        window.history.replaceState({}, "", url);
+      }
+    } catch (_error) {
+      return;
+    }
+  }
+
+  function setOptionalUrlParam(url, name, value, defaultValue) {
+    if (!value || value === defaultValue) {
+      url.searchParams.delete(name);
+      return;
+    }
+    url.searchParams.set(name, value);
+  }
+
   function saveConfig(config) {
+    syncShareUrlParams(config);
     writeStorage(window.localStorage, CONFIG_KEY, JSON.stringify(config));
   }
 
@@ -238,6 +513,7 @@
   function hydrateForm() {
     els.tokenInput.value = loadToken();
     els.hideDraftsInput.checked = state.config.hideDrafts;
+    els.autoRefreshSelect.value = String(state.config.autoRefreshMinutes);
     updateTokenSaveState();
   }
 
@@ -249,16 +525,34 @@
 
   function readForm() {
     return {
-      repo: cleanRepoPart(els.repoSelect.value) || defaults.repo,
+      repo: resolveRepoValue(els.repoSelect.value),
       reviewerFilter: normalizeFilterValue(els.reviewerFilterSelect.value || state.config.reviewerFilter),
       statusFilter: normalizeStatusFilter(els.statusFilterSelect.value || state.config.statusFilter),
+      ageFilter: normalizeAgeFilter(state.config.ageFilter),
       sortMode: normalizeSortMode(els.sortSelect.value || state.config.sortMode),
+      autoRefreshMinutes: normalizeAutoRefreshMinutes(els.autoRefreshSelect.value),
       hideDrafts: els.hideDraftsInput.checked
     };
   }
 
+  function resolveRepoValue(value) {
+    var cleaned = cleanRepoPart(value) || defaults.repo;
+    var match = state.repos.find(function (repo) {
+      return String(repo.name || "").toLowerCase() === cleaned.toLowerCase();
+    });
+    return match && match.name ? match.name : cleaned;
+  }
+
   function cleanRepoPart(value) {
-    return String(value || "").trim().replace(/^\/+|\/+$/g, "");
+    var cleanValue = String(value || "").trim().replace(/^\/+|\/+$/g, "");
+    var parts = cleanValue.split("/").filter(Boolean);
+    if (parts.length >= 2) {
+      if (parts[parts.length - 2].toLowerCase() === ORG_OWNER.toLowerCase()) {
+        return parts[parts.length - 1];
+      }
+      return parts[parts.length - 1];
+    }
+    return cleanValue;
   }
 
   function normalizeFilterValue(value) {
@@ -281,6 +575,41 @@
   function normalizeStatusFilter(value) {
     var key = String(value || "all").trim().toLowerCase();
     return ["all", "ready", "draft", "stale"].indexOf(key) >= 0 ? key : "all";
+  }
+
+  function normalizeAgeFilter(value) {
+    var key = String(value || "all").trim().toLowerCase();
+    return ["all", "green", "yellow", "red", "draft"].indexOf(key) >= 0 ? key : "all";
+  }
+
+  function normalizeAutoRefreshMinutes(value) {
+    var minutes = Number(value);
+    return AUTO_REFRESH_MINUTE_OPTIONS.indexOf(minutes) >= 0 ? minutes : DEFAULT_AUTO_REFRESH_MINUTES;
+  }
+
+  function normalizeDraftVisibility(value) {
+    var key = String(value || "").trim().toLowerCase();
+    if (key === "show") {
+      return false;
+    }
+    if (key === "hide") {
+      return true;
+    }
+    return null;
+  }
+
+  function configureAutoRefresh() {
+    if (state.refreshTimerId) {
+      window.clearInterval(state.refreshTimerId);
+      state.refreshTimerId = null;
+    }
+
+    var minutes = normalizeAutoRefreshMinutes(state.config.autoRefreshMinutes);
+    if (!minutes) {
+      return;
+    }
+
+    state.refreshTimerId = window.setInterval(refreshDashboard, minutes * 60 * 1000);
   }
 
   function normalizeSortMode(value) {
@@ -333,6 +662,7 @@
       state.lastUpdated = new Date();
       render();
       setStatus("Updated " + formatClock(state.lastUpdated), "ok");
+      setUpdatedTooltip();
     } catch (error) {
       if (requestId !== state.dashboardRequestId) {
         return;
@@ -474,46 +804,81 @@
     renderReviewerFilterOptions(model);
     renderStatusFilterOptions(model);
     renderSortOptions(model);
+    renderAgeLegend(model);
+    renderClearFilters(model);
     renderMetrics(model);
     renderBoard(model);
 
-    if (state.lastUpdated) {
-      els.boardMeta.textContent = formatBoardMeta(model);
-    } else {
+    renderBoardMeta(model);
+  }
+
+  function renderBoardMeta(model) {
+    els.boardMeta.replaceChildren();
+
+    if (!state.lastUpdated) {
       els.boardMeta.textContent = "Waiting for GitHub";
+      return;
+    }
+
+    appendMetaPart("", state.pulls.length, " open PRs");
+    appendMetaPart("Updated ", formatClock(state.lastUpdated), "");
+    if (model.selectedFilter !== "all") {
+      appendMetaPart("Filtered to ", getFilterLabel(model.selectedFilter, model), "");
+    }
+    if (model.selectedStatus !== "all") {
+      appendMetaPart("Status ", model.selectedStatus, "");
+    }
+    if (model.selectedAge !== "all") {
+      appendMetaPart("Age ", getAgeFilterLabel(model.selectedAge), "");
+    }
+    if (model.hideDrafts && model.hiddenDraftCount) {
+      appendMetaPart("", model.hiddenDraftCount, " drafts hidden");
     }
   }
 
-  function formatBoardMeta(model) {
-    var text = state.pulls.length + " open PRs fetched at " + formatClock(state.lastUpdated) + "; auto-refresh every " + REFRESH_INTERVAL_MINUTES + "m";
-    if (model.selectedFilter !== "all") {
-      text += "; filtered to " + getFilterLabel(model.selectedFilter, model);
+  function setUpdatedTooltip() {
+    if (!state.lastUpdated) {
+      els.statusPill.title = "";
+      return;
     }
-    if (model.selectedStatus !== "all") {
-      text += "; " + model.selectedStatus;
+    els.statusPill.title = "Last updated " + formatFullDateTime(state.lastUpdated);
+  }
+
+  function appendMetaPart(prefix, value, suffix) {
+    var item = document.createElement("span");
+    if (prefix) {
+      item.appendChild(document.createTextNode(prefix));
     }
-    if (model.hideDrafts && model.hiddenDraftCount) {
-      text += "; " + model.hiddenDraftCount + " drafts hidden";
+    var strong = document.createElement("strong");
+    strong.textContent = String(value);
+    item.appendChild(strong);
+    if (suffix) {
+      item.appendChild(document.createTextNode(suffix));
     }
-    return text;
+    els.boardMeta.appendChild(item);
+  }
+
+  function getAgeFilterLabel(value) {
+    if (value === "green") {
+      return "< 7d";
+    }
+    if (value === "yellow") {
+      return "7-14d";
+    }
+    if (value === "red") {
+      return "> 14d";
+    }
+    if (value === "draft") {
+      return "Draft";
+    }
+    return "All";
   }
 
   function renderRepoOptions() {
     var selected = cleanRepoPart(state.config.repo) || defaults.repo;
-    var seen = new Set();
-    var fragment = document.createDocumentFragment();
-
-    addRepoOption({
-      name: selected,
-      current: true
-    });
-
-    state.repos.forEach(function (repo) {
-      addRepoOption(repo);
-    });
-
-    els.repoSelect.replaceChildren(fragment);
     els.repoSelect.value = selected;
+    els.repoSelectLabel.textContent = selected;
+    renderRepoMenuOptions();
 
     if (state.reposLoading) {
       els.repoPickerHint.textContent = "Loading " + ORG_OWNER + " repositories";
@@ -527,6 +892,36 @@
         : "";
       els.repoPickerHint.title = "";
     }
+  }
+
+  function renderRepoMenuOptions() {
+    var options = getRepoMenuOptions();
+    var query = els.repoSearchInput.value.trim().toLowerCase();
+    var selected = cleanRepoPart(state.config.repo) || defaults.repo;
+    var matches = options.filter(function (option) {
+      return !query || option.value.toLowerCase().indexOf(query) >= 0 || option.label.toLowerCase().indexOf(query) >= 0;
+    });
+    var fragment = document.createDocumentFragment();
+
+    matches.forEach(function (option) {
+      fragment.appendChild(createSearchSelectOption(option.value, option.label, option.value === selected));
+    });
+
+    if (!matches.length) {
+      fragment.appendChild(createSearchSelectEmpty("No repositories found"));
+    }
+
+    els.repoOptions.replaceChildren(fragment);
+  }
+
+  function getRepoMenuOptions() {
+    var selected = cleanRepoPart(state.config.repo) || defaults.repo;
+    var seen = new Set();
+    var options = [];
+
+    addRepoOption({ name: selected });
+    state.repos.forEach(addRepoOption);
+    return options;
 
     function addRepoOption(repo) {
       var name = cleanRepoPart(repo.name || "");
@@ -535,11 +930,10 @@
         return;
       }
       seen.add(key);
-
-      var option = document.createElement("option");
-      option.value = name;
-      option.textContent = formatRepoOption(repo);
-      fragment.appendChild(option);
+      options.push({
+        value: name,
+        label: formatRepoOption(repo)
+      });
     }
   }
 
@@ -558,12 +952,16 @@
   function buildWorkloadModel(pulls, config) {
     var hideDrafts = config.hideDrafts !== false;
     var selectedStatus = normalizeStatusFilter(config.statusFilter);
+    var selectedAge = normalizeAgeFilter(config.ageFilter);
     var selectedSort = normalizeSortMode(config.sortMode);
     var modelPulls = hideDrafts ? pulls.filter(function (pull) {
       return !pull.draft;
     }) : pulls;
     if (hideDrafts && selectedStatus === "draft") {
       selectedStatus = "all";
+    }
+    if (hideDrafts && selectedAge === "draft") {
+      selectedAge = "all";
     }
 
     var reviewerByLogin = new Map();
@@ -605,13 +1003,15 @@
     });
 
     var selectedFilter = resolveReviewTargetFilter(config.reviewerFilter, reviewerByLogin, teamBySlug, noTeamReviewer.length);
-    var visiblePulls = filterPullsByStatus(modelPulls, selectedStatus);
-    var visibleNoTeamReviewer = filterPullsByStatus(noTeamReviewer, selectedStatus);
+    var visiblePulls = filterPullsByAge(filterPullsByStatus(modelPulls, selectedStatus), selectedAge);
+    var visibleNoTeamReviewer = filterPullsByAge(filterPullsByStatus(noTeamReviewer, selectedStatus), selectedAge);
     var lanes = buildLanesForFilter(selectedFilter, visiblePulls, reviewerOptions, reviewerByLogin, teamOptions, pullTeamMatches, visibleNoTeamReviewer, selectedSort);
 
     var assignmentCount = modelPulls.reduce(function (total, pull) {
       return total + getReviewers(pull).length + pullTeamMatches.get(pull.number).length;
     }, 0);
+    var agingPulls = modelPulls.filter(isAgingPull);
+    var oldestAgingDays = getOldestPullAgeDays(agingPulls);
 
     return {
       lanes: lanes,
@@ -621,13 +1021,15 @@
       teamCounts: teamCounts,
       selectedFilter: selectedFilter,
       selectedStatus: selectedStatus,
+      selectedAge: selectedAge,
       selectedSort: selectedSort,
       hideDrafts: hideDrafts,
       hiddenDraftCount: pulls.length - modelPulls.length,
       statusCounts: buildStatusCounts(modelPulls),
       openPrCount: modelPulls.length,
       assignmentCount: assignmentCount,
-      activeReviewerCount: reviewerOptions.length,
+      agingReviewCount: agingPulls.length,
+      oldestAgingDays: oldestAgingDays,
       unassignedCount: noTeamReviewer.length,
       teamMatches: pullTeamMatches
     };
@@ -635,25 +1037,23 @@
 
   function buildLanesForFilter(selectedFilter, pulls, reviewerOptions, reviewerByLogin, teamOptions, pullTeamMatches, noTeamReviewer, sortMode) {
     if (selectedFilter === "all") {
-      var lanes = reviewerOptions.map(function (reviewer) {
+      var personLanes = reviewerOptions.map(function (reviewer) {
         return createPersonLane(reviewer.login.toLowerCase(), pulls, reviewerByLogin, sortMode);
       });
-
-      lanes.sort(sortLanesByCount);
+      personLanes.sort(sortLanesByUrgency);
+      var lanes = personLanes.slice();
 
       var teamItems = pulls.filter(function (pull) {
         return pullTeamMatches.get(pull.number).length > 0;
       });
 
       if (teamItems.length) {
-        lanes.push({
+        lanes.push(createLaneModel({
           type: "team",
           title: "Team requests",
           subtitle: "requested teams",
-          avatarUrl: "",
-          count: teamItems.length,
-          items: sortPulls(teamItems, sortMode)
-        });
+          avatarUrl: ""
+        }, teamItems, sortMode));
       }
 
       lanes.push(createUnassignedLane(noTeamReviewer, sortMode));
@@ -680,14 +1080,12 @@
       });
     });
 
-    return {
+    return createLaneModel({
       type: "person",
       title: reviewer ? reviewer.login : handle,
       subtitle: reviewer ? "@" + reviewer.login : "@" + handle,
-      avatarUrl: reviewer ? reviewer.avatar_url : "",
-      count: items.length,
-      items: sortPulls(items, sortMode)
-    };
+      avatarUrl: reviewer ? reviewer.avatar_url : ""
+    }, items, sortMode);
   }
 
   function createTeamLane(slug, pulls, teams, pullTeamMatches, sortMode) {
@@ -701,28 +1099,46 @@
       });
     });
 
-    return {
+    return createLaneModel({
       type: "team",
       title: team && team.name ? team.name : slug,
       subtitle: "@" + ORG_OWNER + "/" + (team && team.slug ? team.slug : slug),
-      avatarUrl: "",
-      count: items.length,
-      items: sortPulls(items, sortMode)
-    };
+      avatarUrl: ""
+    }, items, sortMode);
   }
 
   function createUnassignedLane(items, sortMode) {
-    return {
+    return createLaneModel({
       type: "unassigned",
       title: "No reviewer requested",
       subtitle: "needs assignment",
-      avatarUrl: "",
-      count: items.length,
-      items: sortPulls(items, sortMode)
-    };
+      avatarUrl: ""
+    }, items, sortMode);
   }
 
-  function sortLanesByCount(a, b) {
+  function createLaneModel(base, items, sortMode) {
+    var sortedItems = sortPulls(items, sortMode);
+    return Object.assign({}, base, {
+      count: sortedItems.length,
+      items: sortedItems,
+      ageSummary: buildAgeSummary(sortedItems),
+      oldestDays: getOldestPullAgeDays(sortedItems)
+    });
+  }
+
+  function sortLanesByUrgency(a, b) {
+    var redDelta = b.ageSummary.red - a.ageSummary.red;
+    if (redDelta) {
+      return redDelta;
+    }
+    var oldestDelta = b.oldestDays - a.oldestDays;
+    if (oldestDelta) {
+      return oldestDelta;
+    }
+    var yellowDelta = b.ageSummary.yellow - a.ageSummary.yellow;
+    if (yellowDelta) {
+      return yellowDelta;
+    }
     if (b.count !== a.count) {
       return b.count - a.count;
     }
@@ -774,48 +1190,102 @@
   }
 
   function renderReviewerFilterOptions(model) {
-    var fragment = document.createDocumentFragment();
-    var allOption = document.createElement("option");
-    allOption.value = "all";
-    allOption.textContent = "All open PRs (" + model.openPrCount + ")";
-    fragment.appendChild(allOption);
+    var options = [];
+    addReviewerFilterOption("all", "All open PRs (" + model.openPrCount + ")", "All");
 
     if (model.reviewerOptions.length) {
-      var peopleGroup = document.createElement("optgroup");
-      peopleGroup.label = "People";
       model.reviewerOptions.forEach(function (reviewer) {
         var key = reviewer.login.toLowerCase();
-        var option = document.createElement("option");
-        option.value = "user:" + key;
-        option.textContent = "@" + reviewer.login + " (" + (model.reviewerCounts.get(key) || 0) + ")";
-        peopleGroup.appendChild(option);
+        addReviewerFilterOption("user:" + key, "@" + reviewer.login + " (" + (model.reviewerCounts.get(key) || 0) + ")", "People");
       });
-      fragment.appendChild(peopleGroup);
     }
 
     if (model.teamOptions.length) {
-      var teamsGroup = document.createElement("optgroup");
-      teamsGroup.label = "Teams";
       model.teamOptions.forEach(function (team) {
         var key = String(team.slug || "").toLowerCase();
-        var option = document.createElement("option");
-        option.value = "team:" + key;
-        option.textContent = "@" + ORG_OWNER + "/" + team.slug + " (" + (model.teamCounts.get(key) || 0) + ")";
-        teamsGroup.appendChild(option);
+        addReviewerFilterOption("team:" + key, "@" + ORG_OWNER + "/" + team.slug + " (" + (model.teamCounts.get(key) || 0) + ")", "Teams");
       });
-      fragment.appendChild(teamsGroup);
     }
 
     if (model.unassignedCount > 0) {
-      var option = document.createElement("option");
-      option.value = "unassigned";
-      option.textContent = "No reviewer requested (" + model.unassignedCount + ")";
-      fragment.appendChild(option);
+      addReviewerFilterOption("unassigned", "No reviewer requested (" + model.unassignedCount + ")", "Other");
     }
 
-    els.reviewerFilterSelect.replaceChildren(fragment);
+    state.reviewerFilterOptions = options;
     els.reviewerFilterSelect.value = model.selectedFilter;
-    els.reviewerFilterSelect.disabled = !model.openPrCount;
+    els.reviewerFilterLabel.textContent = getSearchOptionLabel(options, model.selectedFilter) || "All open PRs";
+    els.reviewerFilterButton.disabled = !model.openPrCount;
+    renderReviewerFilterMenuOptions();
+
+    function addReviewerFilterOption(value, label, group) {
+      options.push({
+        value: value,
+        label: label,
+        group: group
+      });
+    }
+  }
+
+  function renderReviewerFilterMenuOptions() {
+    var query = els.reviewerFilterSearchInput.value.trim().toLowerCase();
+    var selected = normalizeFilterValue(els.reviewerFilterSelect.value || state.config.reviewerFilter);
+    var matches = state.reviewerFilterOptions.filter(function (option) {
+      return !query || option.label.toLowerCase().indexOf(query) >= 0 || option.value.toLowerCase().indexOf(query) >= 0;
+    });
+    var fragment = document.createDocumentFragment();
+    var lastGroup = "";
+
+    matches.forEach(function (option) {
+      if (option.group && option.group !== lastGroup) {
+        fragment.appendChild(createSearchSelectGroup(option.group));
+        lastGroup = option.group;
+      }
+      fragment.appendChild(createSearchSelectOption(option.value, option.label, option.value === selected));
+    });
+
+    if (!matches.length) {
+      fragment.appendChild(createSearchSelectEmpty("No reviewers or teams found"));
+    }
+
+    els.reviewerFilterOptions.replaceChildren(fragment);
+  }
+
+  function createSearchSelectOption(value, label, selected) {
+    var button = document.createElement("button");
+    button.className = "search-select-option";
+    button.type = "button";
+    button.setAttribute("role", "option");
+    button.setAttribute("aria-selected", String(Boolean(selected)));
+    button.setAttribute("data-value", value);
+    if (selected) {
+      button.classList.add("is-selected");
+    }
+
+    var text = document.createElement("span");
+    text.textContent = label;
+    button.appendChild(text);
+    return button;
+  }
+
+  function createSearchSelectGroup(label) {
+    var group = document.createElement("div");
+    group.className = "search-select-group";
+    group.textContent = label;
+    return group;
+  }
+
+  function createSearchSelectEmpty(text) {
+    var empty = document.createElement("div");
+    empty.className = "search-select-empty";
+    empty.textContent = text;
+    return empty;
+  }
+
+  function getSearchOptionLabel(options, value) {
+    var match = options.find(function (option) {
+      return option.value === value;
+    });
+    return match ? match.label : "";
   }
 
   function renderStatusFilterOptions(model) {
@@ -841,10 +1311,31 @@
     els.hideDraftsInput.checked = model.hideDrafts;
   }
 
+  function renderAgeLegend(model) {
+    els.draftAgeLegend.hidden = model.hideDrafts;
+    els.ageFilterButtons.forEach(function (button) {
+      var value = normalizeAgeFilter(button.getAttribute("data-age-filter"));
+      var isActive = model.selectedAge === value;
+      button.classList.toggle("is-active", isActive);
+      button.setAttribute("aria-pressed", String(isActive));
+      button.title = isActive ? "Clear age filter" : "Show " + getAgeFilterLabel(value) + " PRs";
+    });
+  }
+
+  function renderClearFilters(model) {
+    els.clearFiltersButton.hidden = !hasActiveFilters(model);
+  }
+
+  function hasActiveFilters(model) {
+    return model.selectedFilter !== "all" || model.selectedStatus !== "all" || model.selectedAge !== "all";
+  }
+
   function renderMetrics(model) {
     els.openPrCount.textContent = String(model.openPrCount);
     els.assignmentCount.textContent = String(model.assignmentCount);
-    els.activeReviewerCount.textContent = String(model.activeReviewerCount);
+    els.agingReviewCount.textContent = String(model.agingReviewCount);
+    els.agingMetric.classList.toggle("is-attention", model.agingReviewCount > 0);
+    els.agingBadge.textContent = model.agingReviewCount > 0 ? "Oldest " + model.oldestAgingDays + "d" : "Clear";
     els.unassignedCount.textContent = String(model.unassignedCount);
     els.unassignedMetric.classList.toggle("is-attention", model.unassignedCount > 0);
     els.unassignedBadge.textContent = model.unassignedCount > 0 ? "Needs reviewer" : "Clear";
@@ -885,6 +1376,9 @@
     if (lane.type === "unassigned") {
       section.classList.add("is-unassigned");
     }
+    if (lane.ageSummary.red > 0) {
+      section.classList.add("has-aging");
+    }
 
     var header = document.createElement("header");
     header.className = "lane-header";
@@ -901,13 +1395,26 @@
     subtitle.className = "lane-subtitle";
     subtitle.textContent = lane.subtitle;
     titleWrap.append(title, subtitle);
+    var breakdown = createLaneAgeBreakdown(lane.ageSummary);
+    if (breakdown) {
+      titleWrap.appendChild(breakdown);
+    }
     person.appendChild(titleWrap);
 
+    var stats = document.createElement("div");
+    stats.className = "lane-stats";
+    if (lane.oldestDays > 0) {
+      var oldest = document.createElement("span");
+      oldest.className = "lane-oldest";
+      oldest.textContent = "oldest " + lane.oldestDays + "d";
+      stats.appendChild(oldest);
+    }
     var count = document.createElement("span");
     count.className = "lane-count";
     count.textContent = String(lane.count);
+    stats.appendChild(count);
 
-    header.append(person, count);
+    header.append(person, stats);
     section.appendChild(header);
 
     var body = document.createElement("div");
@@ -925,6 +1432,31 @@
     section.appendChild(body);
 
     return section;
+  }
+
+  function createLaneAgeBreakdown(summary) {
+    var entries = [
+      { key: "red", label: ">14d", count: summary.red },
+      { key: "yellow", label: "7-14d", count: summary.yellow },
+      { key: "green", label: "<7d", count: summary.green },
+      { key: "draft", label: "draft", count: summary.draft }
+    ].filter(function (entry) {
+      return entry.count > 0;
+    });
+
+    if (!entries.length) {
+      return null;
+    }
+
+    var wrap = document.createElement("div");
+    wrap.className = "lane-age-breakdown";
+    entries.forEach(function (entry) {
+      var chip = document.createElement("span");
+      chip.className = "lane-age-chip lane-age-" + entry.key;
+      chip.textContent = entry.count + " " + entry.label;
+      wrap.appendChild(chip);
+    });
+    return wrap;
   }
 
   function createAvatar(lane) {
@@ -1083,6 +1615,15 @@
     });
   }
 
+  function filterPullsByAge(pulls, ageFilter) {
+    if (ageFilter === "all") {
+      return pulls;
+    }
+    return pulls.filter(function (pull) {
+      return getPullAgeCategory(pull) === ageFilter;
+    });
+  }
+
   function buildStatusCounts(pulls) {
     return pulls.reduce(function (counts, pull) {
       counts[getPullStatus(pull)] += 1;
@@ -1092,6 +1633,28 @@
       draft: 0,
       stale: 0
     });
+  }
+
+  function buildAgeSummary(pulls) {
+    return pulls.reduce(function (summary, pull) {
+      summary[getPullAgeCategory(pull)] += 1;
+      return summary;
+    }, {
+      green: 0,
+      yellow: 0,
+      red: 0,
+      draft: 0
+    });
+  }
+
+  function getOldestPullAgeDays(pulls) {
+    var oldest = pulls.reduce(function (max, pull) {
+      if (pull.draft) {
+        return max;
+      }
+      return Math.max(max, Date.now() - new Date(pull.created_at).getTime());
+    }, 0);
+    return oldest ? Math.max(1, Math.round(oldest / (24 * 60 * 60 * 1000))) : 0;
   }
 
   function getPullStatus(pull) {
@@ -1113,6 +1676,14 @@
       return "yellow";
     }
     return "green";
+  }
+
+  function getPullAgeCategory(pull) {
+    return pull.draft ? "draft" : getPullAgeLevel(pull);
+  }
+
+  function isAgingPull(pull) {
+    return !pull.draft && getPullAgeLevel(pull) === "red";
   }
 
   function getPullAgePriority(pull) {
@@ -1145,6 +1716,9 @@
     els.statusPill.textContent = text;
     els.statusPill.classList.toggle("is-loading", mode === "loading");
     els.statusPill.classList.toggle("is-error", mode === "error");
+    if (mode !== "ok") {
+      els.statusPill.title = "";
+    }
   }
 
   function setMessage(text, showSettingsAction) {
@@ -1163,7 +1737,10 @@
       button.className = "message-action";
       button.type = "button";
       button.textContent = "Open Settings";
-      button.addEventListener("click", openSettings);
+      button.addEventListener("click", function (event) {
+        event.stopPropagation();
+        openSettings();
+      });
       els.message.appendChild(button);
     }
   }
@@ -1183,6 +1760,13 @@
     return date.toLocaleTimeString([], {
       hour: "2-digit",
       minute: "2-digit"
+    });
+  }
+
+  function formatFullDateTime(date) {
+    return date.toLocaleString([], {
+      dateStyle: "medium",
+      timeStyle: "medium"
     });
   }
 

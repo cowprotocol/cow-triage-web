@@ -14,20 +14,29 @@
         <div class="brand">
           <img class="brand-mark" src="./assets/cowswap-icon.png" alt="" aria-hidden="true">
           <div>
-            <h1>CoW Triage</h1>
+            <div class="brand-title-row">
+              <h1>CoW Triage</h1>
+              <span class="version-badge">v0.1</span>
+            </div>
+            <p class="brand-tagline">Open PR review load across CoW Protocol repos.</p>
           </div>
         </div>
         <div class="top-actions">
-          <label class="repo-picker header-repo-picker">
+          <div class="repo-picker header-repo-picker">
             <span class="label-row">
               <span id="repoPickerHint" class="field-hint">Loading repositories</span>
             </span>
-            <div class="breadcrumb-select">
-              <select id="repoSelect" class="repo-select" name="repo" aria-label="Repository">
-                <option value="cowswap">cowswap</option>
-              </select>
+            <input id="repoSelect" name="repo" type="hidden" value="cowswap">
+            <div id="repoCombobox" class="breadcrumb-select search-select">
+              <button id="repoSelectButton" class="search-select-button repo-select" type="button" aria-label="Repository" aria-haspopup="listbox" aria-expanded="false" aria-controls="repoOptions">
+                <span id="repoSelectLabel">cowswap</span>
+              </button>
+              <div id="repoSelectMenu" class="search-select-menu" hidden>
+                <input id="repoSearchInput" class="search-select-search" type="search" placeholder="Search repositories" autocomplete="off">
+                <div id="repoOptions" class="search-select-options" role="listbox"></div>
+              </div>
             </div>
-          </label>
+          </div>
           <span id="statusPill" class="status-pill">Idle</span>
           <button id="refreshButton" class="button button-primary" type="button">Refresh</button>
           <details id="settingsMenu" class="settings-menu">
@@ -47,6 +56,21 @@
               <div class="settings-divider" aria-hidden="true"></div>
               <div class="settings-section">
                 <label>
+                  <span>Auto-refresh</span>
+                  <select id="autoRefreshSelect" name="autoRefresh">
+                    <option value="0">Off</option>
+                    <option value="5">Every 5 minutes</option>
+                    <option value="10">Every 10 minutes</option>
+                    <option value="15">Every 15 minutes</option>
+                    <option value="30">Every 30 minutes</option>
+                    <option value="60">Every 60 minutes</option>
+                  </select>
+                  <span class="settings-note">Refreshes GitHub data in the background. Manual refresh always works.</span>
+                </label>
+              </div>
+              <div class="settings-divider" aria-hidden="true"></div>
+              <div class="settings-section">
+                <label>
                   <span>GitHub token</span>
                   <div class="token-input-row">
                     <input id="tokenInput" name="token" type="password" placeholder="Optional PAT">
@@ -54,6 +78,10 @@
                   </div>
                   <span class="settings-note">Needed for higher rate limits and to see org team review requests.</span>
                 </label>
+                <div class="token-safety-note">
+                  <strong>Token safety</strong>
+                  <span>Use a fine-grained token for `cowprotocol` with only Metadata: read and Pull requests: read. Avoid classic tokens and never grant write, admin, workflow, or code permissions. The token stays in this browser session and is sent only to GitHub.</span>
+                </div>
                 <div class="settings-footer-row">
                   <a class="settings-help" href="https://github.com/settings/personal-access-tokens/new?name=CoW%20Triage&description=Read%20CoW%20repository%20pull%20requests&target_name=cowprotocol&metadata=read&pull_requests=read" target="_blank" rel="noreferrer">Create token on GitHub</a>
                   <button id="tokenSaveButton" class="settings-save-button" type="button" disabled>Saved</button>
@@ -84,14 +112,17 @@
             <strong id="openPrCount">0</strong>
           </article>
           <article class="metric">
-            <span>Review assignments</span>
+            <span>Requested reviews</span>
             <strong id="assignmentCount">0</strong>
           </article>
-          <article class="metric">
-            <span>Active reviewers</span>
-            <strong id="activeReviewerCount">0</strong>
+          <article id="agingMetric" class="metric metric-aging metric-clickable" role="button" tabindex="0" aria-label="Filter to PRs open for more than 14 days" title="Filter to PRs open for more than 14 days">
+            <div class="metric-title-row">
+              <span>Aging reviews</span>
+              <span id="agingBadge" class="metric-badge">Clear</span>
+            </div>
+            <strong id="agingReviewCount">0</strong>
           </article>
-          <article id="unassignedMetric" class="metric metric-alert">
+          <article id="unassignedMetric" class="metric metric-alert metric-clickable" role="button" tabindex="0" aria-label="Filter to PRs with no reviewer requested" title="Filter to PRs with no reviewer requested">
             <div class="metric-title-row">
               <span>No reviewer requested</span>
               <span id="unassignedBadge" class="metric-badge">Needs reviewer</span>
@@ -101,17 +132,33 @@
         </section>
 
         <section class="board-header">
-          <div>
+          <div class="board-heading">
             <h2>Review workload</h2>
             <p id="boardMeta">Waiting for GitHub</p>
           </div>
           <div class="board-controls">
-            <label class="filter-control">
-              <span>Review target</span>
-              <select id="reviewerFilterSelect" name="reviewerFilter">
-                <option value="all">All review targets</option>
-              </select>
-            </label>
+            <div class="filter-control filter-control-age">
+              <span>Age</span>
+              <div class="age-legend" aria-label="PR age filter">
+                <button class="age-chip age-filter age-green" type="button" data-age-filter="green">&lt; 7d</button>
+                <button class="age-chip age-filter age-yellow" type="button" data-age-filter="yellow">7-14d</button>
+                <button class="age-chip age-filter age-red" type="button" data-age-filter="red">&gt; 14d</button>
+                <button id="draftAgeLegend" class="age-chip age-filter age-neutral" type="button" data-age-filter="draft">Draft</button>
+              </div>
+            </div>
+            <div class="filter-control">
+              <span>Reviewer / team</span>
+              <input id="reviewerFilterSelect" name="reviewerFilter" type="hidden" value="all">
+              <div id="reviewerFilterCombobox" class="search-select">
+                <button id="reviewerFilterButton" class="search-select-button" type="button" aria-label="Reviewer or team" aria-haspopup="listbox" aria-expanded="false" aria-controls="reviewerFilterOptions">
+                  <span id="reviewerFilterLabel">All open PRs</span>
+                </button>
+                <div id="reviewerFilterMenu" class="search-select-menu" hidden>
+                  <input id="reviewerFilterSearchInput" class="search-select-search" type="search" placeholder="Search reviewers and teams" autocomplete="off">
+                  <div id="reviewerFilterOptions" class="search-select-options" role="listbox"></div>
+                </div>
+              </div>
+            </div>
             <label class="filter-control filter-control-small">
               <span>Status</span>
               <select id="statusFilterSelect" name="statusFilter">
@@ -130,6 +177,16 @@
                 <option value="newest">Newest</option>
               </select>
             </label>
+            <button id="clearFiltersButton" class="clear-filters-button" type="button" hidden>
+              <svg class="clear-filters-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M3 6h18"></path>
+                <path d="M8 6V4h8v2"></path>
+                <path d="M6 6l1 14h10l1-14"></path>
+                <path d="M10 10v6"></path>
+                <path d="M14 10v6"></path>
+              </svg>
+              <span>Clear filters</span>
+            </button>
           </div>
         </section>
 
