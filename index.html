@@ -56,6 +56,17 @@
       </header>
 
       <main>
+        <section id="firstRunNotice" class="notice" hidden>
+          <div>
+            <strong>Team review requests need a GitHub token.</strong>
+            <span>Without one, GitHub may hide org team reviewers and those PRs can look like they have no reviewer requested.</span>
+          </div>
+          <div class="notice-actions">
+            <button id="noticeSettingsButton" class="notice-button" type="button">Open Settings</button>
+            <button id="noticeDismissButton" class="icon-button" type="button" aria-label="Dismiss notice">x</button>
+          </div>
+        </section>
+
         <section id="message" class="message" hidden></section>
 
         <section class="metric-grid" aria-label="PR metrics">

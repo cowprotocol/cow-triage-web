@@ -3,6 +3,7 @@
 
   var CONFIG_KEY = "cow-web-dashboard-config-v1";
   var TOKEN_KEY = "cow-web-dashboard-token-v1";
+  var FIRST_RUN_NOTICE_KEY = "cow-web-dashboard-first-run-notice-dismissed-v1";
   var ORG_OWNER = "cowprotocol";
   var REFRESH_INTERVAL_MINUTES = 15;
   var REFRESH_INTERVAL_MS = REFRESH_INTERVAL_MINUTES * 60 * 1000;
@@ -35,6 +36,9 @@
     boardScrollTop: document.getElementById("boardScrollTop"),
     boardScrollTopInner: document.getElementById("boardScrollTopInner"),
     boardMeta: document.getElementById("boardMeta"),
+    firstRunNotice: document.getElementById("firstRunNotice"),
+    noticeSettingsButton: document.getElementById("noticeSettingsButton"),
+    noticeDismissButton: document.getElementById("noticeDismissButton"),
     message: document.getElementById("message"),
     repoSelect: document.getElementById("repoSelect"),
     repoPickerHint: document.getElementById("repoPickerHint"),
@@ -58,6 +62,7 @@
   hydrateForm();
   bindEvents();
   bindBoardScroll();
+  renderFirstRunNotice();
   renderRepoOptions();
   render();
   refreshRepositories();
@@ -113,6 +118,19 @@
     els.settingsCloseButton.addEventListener("click", function () {
       els.settingsMenu.open = false;
     });
+
+    els.noticeSettingsButton.addEventListener("click", function () {
+      openSettings();
+    });
+
+    els.noticeDismissButton.addEventListener("click", function () {
+      writeStorage(window.localStorage, FIRST_RUN_NOTICE_KEY, "1");
+      renderFirstRunNotice();
+    });
+  }
+
+  function renderFirstRunNotice() {
+    els.firstRunNotice.hidden = readStorage(window.localStorage, FIRST_RUN_NOTICE_KEY) === "1";
   }
 
   function bindBoardScroll() {
