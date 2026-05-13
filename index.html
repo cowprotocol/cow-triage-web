@@ -39,17 +39,28 @@
                 <strong>Settings</strong>
                 <button id="settingsCloseButton" class="icon-button" type="button" aria-label="Close settings">x</button>
               </div>
-              <label class="checkbox-row">
-                <input id="hideDraftsInput" type="checkbox">
-                <span>Hide draft PRs</span>
-              </label>
-              <span class="settings-note">When hidden, drafts are omitted from metrics, counts, and lanes.</span>
-              <label>
-                <span>GitHub token</span>
-                <input id="tokenInput" name="token" type="password" placeholder="Optional PAT">
-                <span class="settings-note">Needed for higher rate limits and to see org team review requests.</span>
-                <a class="settings-help" href="https://github.com/settings/personal-access-tokens/new?name=CoW%20Triage&description=Read%20CoW%20repository%20pull%20requests&target_name=cowprotocol&metadata=read&pull_requests=read" target="_blank" rel="noreferrer">Create token on GitHub</a>
-              </label>
+              <div class="settings-section">
+                <label class="checkbox-row">
+                  <input id="hideDraftsInput" type="checkbox">
+                  <span>Hide draft PRs</span>
+                </label>
+                <span class="settings-note">When hidden, drafts are omitted from metrics, counts, and lanes.</span>
+              </div>
+              <div class="settings-divider" aria-hidden="true"></div>
+              <div class="settings-section">
+                <label>
+                  <span>GitHub token</span>
+                  <div class="token-input-row">
+                    <input id="tokenInput" name="token" type="password" placeholder="Optional PAT">
+                    <button id="tokenVisibilityButton" class="token-button" type="button" aria-pressed="false">Show</button>
+                  </div>
+                  <span class="settings-note">Needed for higher rate limits and to see org team review requests.</span>
+                </label>
+                <div class="settings-footer-row">
+                  <a class="settings-help" href="https://github.com/settings/personal-access-tokens/new?name=CoW%20Triage&description=Read%20CoW%20repository%20pull%20requests&target_name=cowprotocol&metadata=read&pull_requests=read" target="_blank" rel="noreferrer">Create token on GitHub</a>
+                  <button id="tokenSaveButton" class="settings-save-button" type="button" disabled>Saved</button>
+                </div>
+              </div>
             </div>
           </details>
         </div>

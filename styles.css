@@ -217,17 +217,12 @@ label {
   top: calc(100% + 8px);
   right: 0;
   z-index: 20;
-  width: min(340px, calc(100vw - 32px));
+  width: min(430px, calc(100vw - 32px));
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fff;
   box-shadow: var(--shadow);
   padding: 14px;
-}
-
-.settings-popover label + label,
-.settings-note + label {
-  margin-top: 12px;
 }
 
 .settings-popover-header {
@@ -236,6 +231,17 @@ label {
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 12px;
+}
+
+.settings-section {
+  display: grid;
+  gap: 8px;
+}
+
+.settings-divider {
+  height: 1px;
+  margin: 14px 0;
+  background: var(--line);
 }
 
 .settings-popover-header strong {
@@ -282,11 +288,7 @@ label {
 }
 
 .checkbox-row input {
-  width: 18px;
-  min-height: 18px;
-  height: 18px;
-  flex: 0 0 18px;
-  padding: 0;
+  margin: 0;
 }
 
 .settings-help:hover {
@@ -303,6 +305,62 @@ select {
   background: #fff;
   color: var(--ink);
   padding: 9px 10px;
+}
+
+.settings-popover .checkbox-row input {
+  width: 18px;
+  min-width: 18px;
+  min-height: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  padding: 0;
+}
+
+.token-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.token-input-row input {
+  min-width: 0;
+}
+
+.token-button,
+.settings-save-button {
+  min-height: 40px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+  font-weight: 800;
+  padding: 0 12px;
+}
+
+.token-button:hover,
+.settings-save-button:not(:disabled):hover {
+  border-color: var(--blue);
+}
+
+.settings-save-button {
+  border-color: #174ab9;
+  background: var(--blue);
+  color: #fff;
+}
+
+.settings-save-button:disabled {
+  border-color: var(--line-strong);
+  background: var(--panel-soft);
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.settings-footer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 textarea {

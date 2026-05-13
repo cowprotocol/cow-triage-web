@@ -49,6 +49,8 @@
     settingsCloseButton: document.getElementById("settingsCloseButton"),
     hideDraftsInput: document.getElementById("hideDraftsInput"),
     tokenInput: document.getElementById("tokenInput"),
+    tokenVisibilityButton: document.getElementById("tokenVisibilityButton"),
+    tokenSaveButton: document.getElementById("tokenSaveButton"),
     refreshButton: document.getElementById("refreshButton"),
     statusPill: document.getElementById("statusPill"),
     openPrCount: document.getElementById("openPrCount"),
@@ -74,6 +76,7 @@
       state.config = readForm();
       saveConfig(state.config);
       saveToken(els.tokenInput.value);
+      updateTokenSaveState();
       refreshRepositories();
       refreshDashboard();
     });
@@ -117,6 +120,22 @@
 
     els.settingsCloseButton.addEventListener("click", function () {
       els.settingsMenu.open = false;
+    });
+
+    els.tokenInput.addEventListener("input", updateTokenSaveState);
+
+    els.tokenVisibilityButton.addEventListener("click", function () {
+      var shouldShow = els.tokenInput.type === "password";
+      els.tokenInput.type = shouldShow ? "text" : "password";
+      els.tokenVisibilityButton.textContent = shouldShow ? "Hide" : "Show";
+      els.tokenVisibilityButton.setAttribute("aria-pressed", String(shouldShow));
+    });
+
+    els.tokenSaveButton.addEventListener("click", function () {
+      saveToken(els.tokenInput.value);
+      updateTokenSaveState();
+      refreshRepositories();
+      refreshDashboard();
     });
 
     els.noticeSettingsButton.addEventListener("click", function () {
@@ -219,6 +238,13 @@
   function hydrateForm() {
     els.tokenInput.value = loadToken();
     els.hideDraftsInput.checked = state.config.hideDrafts;
+    updateTokenSaveState();
+  }
+
+  function updateTokenSaveState() {
+    var isDirty = els.tokenInput.value.trim() !== loadToken();
+    els.tokenSaveButton.disabled = !isDirty;
+    els.tokenSaveButton.textContent = isDirty ? "Save" : "Saved";
   }
 
   function readForm() {
