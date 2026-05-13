@@ -8,7 +8,7 @@
 
 **Open it:** https://cow-triage-web.vercel.app/
 
-<img width="3068" height="1399" alt="CoW Triage dashboard screenshot" src="https://github.com/user-attachments/assets/4fed1091-1e0f-403f-b59a-2b24a8e4ac5a" />
+<img width="3323" height="1314" alt="Screenshot_20260513_153047" src="https://github.com/user-attachments/assets/a0f26461-9472-4369-b7f3-958dde699d5f" />
 
 ## ✨ What It Does
 
