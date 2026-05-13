@@ -770,6 +770,27 @@ textarea {
   border-left-color: var(--amber);
 }
 
+.pr-card.pr-age-green {
+  border-left-color: var(--green);
+  background:
+    linear-gradient(135deg, rgba(18, 128, 92, 0.13), rgba(18, 128, 92, 0.04) 40%, rgba(255, 255, 255, 0) 72%),
+    #fff;
+}
+
+.pr-card.pr-age-yellow {
+  border-left-color: var(--amber);
+  background:
+    linear-gradient(135deg, rgba(169, 106, 0, 0.16), rgba(169, 106, 0, 0.05) 42%, rgba(255, 255, 255, 0) 74%),
+    #fff;
+}
+
+.pr-card.pr-age-red {
+  border-left-color: var(--red);
+  background:
+    linear-gradient(135deg, rgba(180, 35, 24, 0.16), rgba(180, 35, 24, 0.06) 42%, rgba(255, 255, 255, 0) 74%),
+    #fff;
+}
+
 .pr-meta {
   display: flex;
   align-items: center;

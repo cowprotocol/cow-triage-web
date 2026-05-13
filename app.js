@@ -953,8 +953,11 @@
     var isStale = getPullStatus(pull) === "stale";
     if (pull.draft) {
       card.classList.add("is-draft");
-    } else if (isStale) {
-      card.classList.add("is-stale");
+    } else {
+      card.classList.add("pr-age-" + getPullAgeLevel(pull));
+      if (isStale) {
+        card.classList.add("is-stale");
+      }
     }
 
     var meta = document.createElement("div");
