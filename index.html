@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CoW Triage</title>
+    <link rel="icon" type="image/png" href="./assets/cowswap-favicon.png">
+    <link rel="apple-touch-icon" href="./assets/cowswap-icon.png">
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <img class="brand-mark" src="./assets/cowswap-icon.png" alt="" aria-hidden="true">
+          <div>
+            <h1>CoW Triage</h1>
+          </div>
+        </div>
+        <div class="top-actions">
+          <label class="repo-picker header-repo-picker">
+            <span class="label-row">
+              <span id="repoPickerHint" class="field-hint">Loading repositories</span>
+            </span>
+            <div class="breadcrumb-select">
+              <span class="crumb-org">cowprotocol</span>
+              <span class="crumb-separator">/</span>
+              <select id="repoSelect" class="repo-select" name="repo" aria-label="Repository">
+                <option value="cowswap">cowswap</option>
+              </select>
+            </div>
+          </label>
+          <span id="statusPill" class="status-pill">Idle</span>
+          <button id="refreshButton" class="button button-primary" type="button">Refresh</button>
+          <details id="settingsMenu" class="settings-menu">
+            <summary>Settings</summary>
+            <div class="settings-popover">
+              <div class="settings-popover-header">
+                <strong>Settings</strong>
+                <button id="settingsCloseButton" class="icon-button" type="button" aria-label="Close settings">x</button>
+              </div>
+              <label>
+                <span>GitHub token</span>
+                <input id="tokenInput" name="token" type="password" placeholder="Optional PAT">
+                <a class="settings-help" href="https://github.com/settings/personal-access-tokens/new?name=CoW%20Web%20Dashboard&description=Read%20CoW%20repository%20pull%20requests&target_name=cowprotocol&metadata=read&pull_requests=read" target="_blank" rel="noreferrer">Create token on GitHub</a>
+              </label>
+            </div>
+          </details>
+        </div>
+      </header>
+
+      <main>
+        <section id="message" class="message" hidden></section>
+
+        <section class="metric-grid" aria-label="PR metrics">
+          <article class="metric">
+            <span>Open PRs</span>
+            <strong id="openPrCount">0</strong>
+          </article>
+          <article class="metric">
+            <span>Review assignments</span>
+            <strong id="assignmentCount">0</strong>
+          </article>
+          <article class="metric">
+            <span>Active reviewers</span>
+            <strong id="activeReviewerCount">0</strong>
+          </article>
+          <article id="unassignedMetric" class="metric metric-alert">
+            <div class="metric-title-row">
+              <span>No reviewer requested</span>
+              <span id="unassignedBadge" class="metric-badge">Needs reviewer</span>
+            </div>
+            <strong id="unassignedCount">0</strong>
+          </article>
+        </section>
+
+        <section class="board-header">
+          <div>
+            <h2>Review workload</h2>
+            <p id="boardMeta">Waiting for GitHub</p>
+          </div>
+          <div class="board-controls">
+            <label class="filter-control">
+              <span>Review target</span>
+              <select id="reviewerFilterSelect" name="reviewerFilter">
+                <option value="all">All review targets</option>
+              </select>
+            </label>
+            <label class="filter-control filter-control-small">
+              <span>Status</span>
+              <select id="statusFilterSelect" name="statusFilter">
+                <option value="all">All statuses</option>
+                <option value="ready">Ready</option>
+                <option value="draft">Draft</option>
+                <option value="stale">Stale</option>
+              </select>
+            </label>
+          </div>
+        </section>
+
+        <div id="boardScrollTop" class="board-scrollbar-top" aria-hidden="true">
+          <div id="boardScrollTopInner" class="board-scrollbar-top-inner"></div>
+        </div>
+        <section id="board" class="board" aria-live="polite"></section>
+      </main>
+    </div>
+
+    <script src="./app.js" defer></script>
+  </body>
+</html>
