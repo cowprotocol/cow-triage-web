@@ -2,6 +2,8 @@
 
 A small static dashboard for current review workload on `cowprotocol` repositories. It defaults to `cowprotocol/cowswap`.
 
+<img width="3068" height="1399" alt="Screenshot_20260513_150822" src="https://github.com/user-attachments/assets/4fed1091-1e0f-403f-b59a-2b24a8e4ac5a" />
+
 Open `index.html` in a browser. The app fetches open PRs from the GitHub REST API and groups them by requested reviewers. An optional GitHub token is kept in `sessionStorage` for the current browser session.
 
 Use the controls at the top to set:
