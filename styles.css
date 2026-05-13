@@ -263,6 +263,12 @@ label {
   text-decoration: none;
 }
 
+.settings-note {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
 .settings-help:hover {
   text-decoration: underline;
 }
