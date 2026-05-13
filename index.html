@@ -39,11 +39,16 @@
                 <strong>Settings</strong>
                 <button id="settingsCloseButton" class="icon-button" type="button" aria-label="Close settings">x</button>
               </div>
+              <label class="checkbox-row">
+                <input id="hideDraftsInput" type="checkbox">
+                <span>Hide draft PRs</span>
+              </label>
+              <span class="settings-note">When hidden, drafts are omitted from metrics, counts, and lanes.</span>
               <label>
                 <span>GitHub token</span>
                 <input id="tokenInput" name="token" type="password" placeholder="Optional PAT">
                 <span class="settings-note">Needed for higher rate limits and to see org team review requests.</span>
-                <a class="settings-help" href="https://github.com/settings/personal-access-tokens/new?name=CoW%20Web%20Dashboard&description=Read%20CoW%20repository%20pull%20requests&target_name=cowprotocol&metadata=read&pull_requests=read" target="_blank" rel="noreferrer">Create token on GitHub</a>
+                <a class="settings-help" href="https://github.com/settings/personal-access-tokens/new?name=CoW%20Triage&description=Read%20CoW%20repository%20pull%20requests&target_name=cowprotocol&metadata=read&pull_requests=read" target="_blank" rel="noreferrer">Create token on GitHub</a>
               </label>
             </div>
           </details>
@@ -94,6 +99,15 @@
                 <option value="ready">Ready</option>
                 <option value="draft">Draft</option>
                 <option value="stale">Stale</option>
+              </select>
+            </label>
+            <label class="filter-control filter-control-small">
+              <span>Sort</span>
+              <select id="sortSelect" name="sort">
+                <option value="priority">Priority</option>
+                <option value="oldest">Oldest</option>
+                <option value="recently-updated">Recently updated</option>
+                <option value="newest">Newest</option>
               </select>
             </label>
           </div>

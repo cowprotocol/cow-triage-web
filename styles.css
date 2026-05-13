@@ -225,6 +225,11 @@ label {
   padding: 14px;
 }
 
+.settings-popover label + label,
+.settings-note + label {
+  margin-top: 12px;
+}
+
 .settings-popover-header {
   display: flex;
   align-items: center;
@@ -267,6 +272,21 @@ label {
   color: var(--muted);
   font-size: 0.78rem;
   font-weight: 650;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+}
+
+.checkbox-row input {
+  width: 18px;
+  min-height: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  padding: 0;
 }
 
 .settings-help:hover {
@@ -684,6 +704,33 @@ textarea {
   color: var(--muted);
   font-size: 0.78rem;
   font-weight: 650;
+}
+
+.age-chip {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 8px;
+  background: var(--panel-soft);
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.age-green {
+  border-color: rgba(18, 128, 92, 0.28);
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.age-yellow {
+  border-color: rgba(169, 106, 0, 0.28);
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+.age-red {
+  border-color: rgba(180, 35, 24, 0.24);
+  background: var(--red-soft);
+  color: var(--red);
 }
 
 .tag {

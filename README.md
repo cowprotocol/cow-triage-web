@@ -9,6 +9,8 @@ Use the controls at the top to set:
 - `Repository`: defaults to `cowswap`; the dropdown is loaded from `cowprotocol`
 - `Settings > GitHub token`: optional, useful for private access or higher API limits
 
-Use the `Review target` dropdown above the board to filter cards to one person, one requested team, or PRs with no requested reviewer. Use `Status` to narrow cards to ready, draft, or stale PRs.
+Use the `Review target` dropdown above the board to filter cards to one person, one requested team, or PRs with no requested reviewer. Use `Status` to narrow cards to ready, draft, or stale PRs, and `Sort` to prioritize older review-ready PRs.
+
+Draft PRs are hidden by default from metrics, counts, and lanes. Toggle this in `Settings`.
 
 The dashboard refreshes every 15 minutes and can be refreshed manually.

@@ -6,12 +6,16 @@
   var ORG_OWNER = "cowprotocol";
   var REFRESH_INTERVAL_MINUTES = 15;
   var REFRESH_INTERVAL_MS = REFRESH_INTERVAL_MINUTES * 60 * 1000;
+  var WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+  var TWO_WEEKS_MS = 2 * WEEK_MS;
   var STALE_AFTER_MS = 3 * 24 * 60 * 60 * 1000;
 
   var defaults = {
     repo: "cowswap",
     reviewerFilter: "all",
-    statusFilter: "all"
+    statusFilter: "all",
+    sortMode: "priority",
+    hideDrafts: true
   };
 
   var state = {
@@ -36,8 +40,10 @@
     repoPickerHint: document.getElementById("repoPickerHint"),
     reviewerFilterSelect: document.getElementById("reviewerFilterSelect"),
     statusFilterSelect: document.getElementById("statusFilterSelect"),
+    sortSelect: document.getElementById("sortSelect"),
     settingsMenu: document.getElementById("settingsMenu"),
     settingsCloseButton: document.getElementById("settingsCloseButton"),
+    hideDraftsInput: document.getElementById("hideDraftsInput"),
     tokenInput: document.getElementById("tokenInput"),
     refreshButton: document.getElementById("refreshButton"),
     statusPill: document.getElementById("statusPill"),
@@ -89,6 +95,21 @@
       render();
     });
 
+    els.sortSelect.addEventListener("change", function () {
+      state.config.sortMode = normalizeSortMode(els.sortSelect.value);
+      saveConfig(state.config);
+      render();
+    });
+
+    els.hideDraftsInput.addEventListener("change", function () {
+      state.config.hideDrafts = els.hideDraftsInput.checked;
+      if (state.config.hideDrafts && state.config.statusFilter === "draft") {
+        state.config.statusFilter = "all";
+      }
+      saveConfig(state.config);
+      render();
+    });
+
     els.settingsCloseButton.addEventListener("click", function () {
       els.settingsMenu.open = false;
     });
@@ -126,7 +147,9 @@
       return {
         repo: cleanRepoPart(config.repo || defaults.repo) || defaults.repo,
         reviewerFilter: normalizeFilterValue(config.reviewerFilter),
-        statusFilter: normalizeStatusFilter(config.statusFilter)
+        statusFilter: normalizeStatusFilter(config.statusFilter),
+        sortMode: normalizeSortMode(config.sortMode),
+        hideDrafts: config.hideDrafts !== false
       };
     } catch (_error) {
       return Object.assign({}, defaults);
@@ -177,13 +200,16 @@
 
   function hydrateForm() {
     els.tokenInput.value = loadToken();
+    els.hideDraftsInput.checked = state.config.hideDrafts;
   }
 
   function readForm() {
     return {
       repo: cleanRepoPart(els.repoSelect.value) || defaults.repo,
       reviewerFilter: normalizeFilterValue(els.reviewerFilterSelect.value || state.config.reviewerFilter),
-      statusFilter: normalizeStatusFilter(els.statusFilterSelect.value || state.config.statusFilter)
+      statusFilter: normalizeStatusFilter(els.statusFilterSelect.value || state.config.statusFilter),
+      sortMode: normalizeSortMode(els.sortSelect.value || state.config.sortMode),
+      hideDrafts: els.hideDraftsInput.checked
     };
   }
 
@@ -211,6 +237,11 @@
   function normalizeStatusFilter(value) {
     var key = String(value || "all").trim().toLowerCase();
     return ["all", "ready", "draft", "stale"].indexOf(key) >= 0 ? key : "all";
+  }
+
+  function normalizeSortMode(value) {
+    var key = String(value || "priority").trim().toLowerCase();
+    return ["priority", "oldest", "recently-updated", "newest"].indexOf(key) >= 0 ? key : "priority";
   }
 
   async function refreshRepositories() {
@@ -398,6 +429,7 @@
     renderRepoOptions();
     renderReviewerFilterOptions(model);
     renderStatusFilterOptions(model);
+    renderSortOptions(model);
     renderMetrics(model);
     renderBoard(model);
 
@@ -415,6 +447,9 @@
     }
     if (model.selectedStatus !== "all") {
       text += "; " + model.selectedStatus;
+    }
+    if (model.hideDrafts && model.hiddenDraftCount) {
+      text += "; " + model.hiddenDraftCount + " drafts hidden";
     }
     return text;
   }
@@ -477,14 +512,23 @@
   }
 
   function buildWorkloadModel(pulls, config) {
+    var hideDrafts = config.hideDrafts !== false;
     var selectedStatus = normalizeStatusFilter(config.statusFilter);
+    var selectedSort = normalizeSortMode(config.sortMode);
+    var modelPulls = hideDrafts ? pulls.filter(function (pull) {
+      return !pull.draft;
+    }) : pulls;
+    if (hideDrafts && selectedStatus === "draft") {
+      selectedStatus = "all";
+    }
+
     var reviewerByLogin = new Map();
     var reviewerCounts = new Map();
     var teamBySlug = new Map();
     var teamCounts = new Map();
     var pullTeamMatches = new Map();
 
-    pulls.forEach(function (pull) {
+    modelPulls.forEach(function (pull) {
       getReviewers(pull).forEach(function (reviewer) {
         var reviewerKey = reviewer.login.toLowerCase();
         reviewerByLogin.set(reviewerKey, reviewer);
@@ -510,18 +554,18 @@
       return String(a.slug || "").localeCompare(String(b.slug || ""));
     });
 
-    var noTeamReviewer = pulls.filter(function (pull) {
+    var noTeamReviewer = modelPulls.filter(function (pull) {
       var hasPerson = getReviewers(pull).length > 0;
       var hasTeam = pullTeamMatches.get(pull.number).length > 0;
       return !hasPerson && !hasTeam;
     });
 
     var selectedFilter = resolveReviewTargetFilter(config.reviewerFilter, reviewerByLogin, teamBySlug, noTeamReviewer.length);
-    var visiblePulls = filterPullsByStatus(pulls, selectedStatus);
+    var visiblePulls = filterPullsByStatus(modelPulls, selectedStatus);
     var visibleNoTeamReviewer = filterPullsByStatus(noTeamReviewer, selectedStatus);
-    var lanes = buildLanesForFilter(selectedFilter, visiblePulls, reviewerOptions, reviewerByLogin, teamOptions, pullTeamMatches, visibleNoTeamReviewer);
+    var lanes = buildLanesForFilter(selectedFilter, visiblePulls, reviewerOptions, reviewerByLogin, teamOptions, pullTeamMatches, visibleNoTeamReviewer, selectedSort);
 
-    var assignmentCount = pulls.reduce(function (total, pull) {
+    var assignmentCount = modelPulls.reduce(function (total, pull) {
       return total + getReviewers(pull).length + pullTeamMatches.get(pull.number).length;
     }, 0);
 
@@ -533,8 +577,11 @@
       teamCounts: teamCounts,
       selectedFilter: selectedFilter,
       selectedStatus: selectedStatus,
-      statusCounts: buildStatusCounts(pulls),
-      openPrCount: pulls.length,
+      selectedSort: selectedSort,
+      hideDrafts: hideDrafts,
+      hiddenDraftCount: pulls.length - modelPulls.length,
+      statusCounts: buildStatusCounts(modelPulls),
+      openPrCount: modelPulls.length,
       assignmentCount: assignmentCount,
       activeReviewerCount: reviewerOptions.length,
       unassignedCount: noTeamReviewer.length,
@@ -542,10 +589,10 @@
     };
   }
 
-  function buildLanesForFilter(selectedFilter, pulls, reviewerOptions, reviewerByLogin, teamOptions, pullTeamMatches, noTeamReviewer) {
+  function buildLanesForFilter(selectedFilter, pulls, reviewerOptions, reviewerByLogin, teamOptions, pullTeamMatches, noTeamReviewer, sortMode) {
     if (selectedFilter === "all") {
       var lanes = reviewerOptions.map(function (reviewer) {
-        return createPersonLane(reviewer.login.toLowerCase(), pulls, reviewerByLogin);
+        return createPersonLane(reviewer.login.toLowerCase(), pulls, reviewerByLogin, sortMode);
       });
 
       lanes.sort(sortLanesByCount);
@@ -561,26 +608,26 @@
           subtitle: "requested teams",
           avatarUrl: "",
           count: teamItems.length,
-          items: sortPulls(teamItems)
+          items: sortPulls(teamItems, sortMode)
         });
       }
 
-      lanes.push(createUnassignedLane(noTeamReviewer));
+      lanes.push(createUnassignedLane(noTeamReviewer, sortMode));
       return lanes;
     }
 
     if (selectedFilter.indexOf("user:") === 0) {
-      return [createPersonLane(selectedFilter.slice(5), pulls, reviewerByLogin)];
+      return [createPersonLane(selectedFilter.slice(5), pulls, reviewerByLogin, sortMode)];
     }
 
     if (selectedFilter.indexOf("team:") === 0) {
-      return [createTeamLane(selectedFilter.slice(5), pulls, teamOptions, pullTeamMatches)];
+      return [createTeamLane(selectedFilter.slice(5), pulls, teamOptions, pullTeamMatches, sortMode)];
     }
 
-    return [createUnassignedLane(noTeamReviewer)];
+    return [createUnassignedLane(noTeamReviewer, sortMode)];
   }
 
-  function createPersonLane(handle, pulls, reviewerByLogin) {
+  function createPersonLane(handle, pulls, reviewerByLogin, sortMode) {
     var key = handle.toLowerCase();
     var reviewer = reviewerByLogin.get(key);
     var items = pulls.filter(function (pull) {
@@ -595,11 +642,11 @@
       subtitle: reviewer ? "@" + reviewer.login : "@" + handle,
       avatarUrl: reviewer ? reviewer.avatar_url : "",
       count: items.length,
-      items: sortPulls(items)
+      items: sortPulls(items, sortMode)
     };
   }
 
-  function createTeamLane(slug, pulls, teams, pullTeamMatches) {
+  function createTeamLane(slug, pulls, teams, pullTeamMatches, sortMode) {
     var key = slug.toLowerCase();
     var team = teams.find(function (candidate) {
       return String(candidate.slug || "").toLowerCase() === key;
@@ -616,18 +663,18 @@
       subtitle: "@" + ORG_OWNER + "/" + (team && team.slug ? team.slug : slug),
       avatarUrl: "",
       count: items.length,
-      items: sortPulls(items)
+      items: sortPulls(items, sortMode)
     };
   }
 
-  function createUnassignedLane(items) {
-      return {
-        type: "unassigned",
-        title: "No reviewer requested",
-        subtitle: "needs assignment",
-        avatarUrl: "",
-        count: items.length,
-      items: sortPulls(items)
+  function createUnassignedLane(items, sortMode) {
+    return {
+      type: "unassigned",
+      title: "No reviewer requested",
+      subtitle: "needs assignment",
+      avatarUrl: "",
+      count: items.length,
+      items: sortPulls(items, sortMode)
     };
   }
 
@@ -730,17 +777,24 @@
   function renderStatusFilterOptions(model) {
     setStatusOptionText("all", "All statuses (" + model.openPrCount + ")");
     setStatusOptionText("ready", "Ready (" + model.statusCounts.ready + ")");
-    setStatusOptionText("draft", "Draft (" + model.statusCounts.draft + ")");
+    setStatusOptionText("draft", model.hideDrafts ? "Draft (hidden)" : "Draft (" + model.statusCounts.draft + ")", model.hideDrafts);
     setStatusOptionText("stale", "Stale (" + model.statusCounts.stale + ")");
     els.statusFilterSelect.value = model.selectedStatus;
     els.statusFilterSelect.disabled = !model.openPrCount;
   }
 
-  function setStatusOptionText(value, text) {
+  function setStatusOptionText(value, text, disabled) {
     var option = els.statusFilterSelect.querySelector("option[value=\"" + value + "\"]");
     if (option) {
       option.textContent = text;
+      option.disabled = Boolean(disabled);
     }
+  }
+
+  function renderSortOptions(model) {
+    els.sortSelect.value = model.selectedSort;
+    els.sortSelect.disabled = !model.openPrCount;
+    els.hideDraftsInput.checked = model.hideDrafts;
   }
 
   function renderMetrics(model) {
@@ -892,6 +946,9 @@
     var author = document.createElement("span");
     author.textContent = "by @" + (pull.user && pull.user.login ? pull.user.login : "unknown");
     var created = document.createElement("span");
+    if (!pull.draft) {
+      created.className = "age-chip age-" + getPullAgeLevel(pull);
+    }
     created.textContent = "opened " + formatRelative(pull.created_at);
     footer.append(author, created);
 
@@ -929,13 +986,45 @@
     ];
   }
 
-  function sortPulls(items) {
+  function sortPulls(items, sortMode) {
+    var mode = normalizeSortMode(sortMode);
     return items.slice().sort(function (a, b) {
-      if (Boolean(a.draft) !== Boolean(b.draft)) {
-        return a.draft ? 1 : -1;
+      if (mode === "priority") {
+        return compareByPriority(a, b);
       }
-      return new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime();
+      if (mode === "oldest") {
+        return compareDatesAsc(a.created_at, b.created_at) || compareNumbersDesc(a.number, b.number);
+      }
+      if (mode === "recently-updated") {
+        return compareDatesDesc(a.updated_at, b.updated_at) || compareNumbersDesc(a.number, b.number);
+      }
+      return compareDatesDesc(a.created_at, b.created_at) || compareNumbersDesc(a.number, b.number);
     });
+  }
+
+  function compareByPriority(a, b) {
+    if (Boolean(a.draft) !== Boolean(b.draft)) {
+      return a.draft ? 1 : -1;
+    }
+
+    var ageDelta = getPullAgePriority(b) - getPullAgePriority(a);
+    if (ageDelta) {
+      return ageDelta;
+    }
+
+    return compareDatesAsc(a.created_at, b.created_at) || compareNumbersDesc(a.number, b.number);
+  }
+
+  function compareDatesAsc(a, b) {
+    return new Date(a).getTime() - new Date(b).getTime();
+  }
+
+  function compareDatesDesc(a, b) {
+    return new Date(b).getTime() - new Date(a).getTime();
+  }
+
+  function compareNumbersDesc(a, b) {
+    return Number(b || 0) - Number(a || 0);
   }
 
   function filterPullsByStatus(pulls, status) {
@@ -966,6 +1055,31 @@
       return "stale";
     }
     return "ready";
+  }
+
+  function getPullAgeLevel(pull) {
+    var age = Date.now() - new Date(pull.created_at).getTime();
+    if (age >= TWO_WEEKS_MS) {
+      return "red";
+    }
+    if (age >= WEEK_MS) {
+      return "yellow";
+    }
+    return "green";
+  }
+
+  function getPullAgePriority(pull) {
+    if (pull.draft) {
+      return 0;
+    }
+    var level = getPullAgeLevel(pull);
+    if (level === "red") {
+      return 3;
+    }
+    if (level === "yellow") {
+      return 2;
+    }
+    return 1;
   }
 
   function getReviewers(pull) {
