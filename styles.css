@@ -778,7 +778,7 @@ textarea {
 
 .metric-clickable:hover {
   border-color: var(--blue);
-  box-shadow: 0 12px 28px rgba(22, 32, 51, 0.08);
+  box-shadow: 0 8px 18px rgba(22, 32, 51, 0.06);
   transform: translateY(-1px);
 }
 
@@ -839,7 +839,7 @@ textarea {
   border-color: rgba(180, 35, 24, 0.34);
   border-left: 5px solid var(--red);
   background: linear-gradient(180deg, #fff5f3, #fff);
-  box-shadow: 0 16px 36px rgba(180, 35, 24, 0.11);
+  box-shadow: 0 6px 18px rgba(180, 35, 24, 0.06);
 }
 
 .metric-aging.is-attention .metric-badge {
@@ -850,19 +850,19 @@ textarea {
 
 .metric-aging.metric-clickable:hover {
   border-color: rgba(180, 35, 24, 0.58);
-  box-shadow: 0 18px 38px rgba(180, 35, 24, 0.16);
+  box-shadow: 0 10px 24px rgba(180, 35, 24, 0.1);
 }
 
 .metric-alert.is-attention {
   border-color: rgba(169, 106, 0, 0.42);
   border-left: 5px solid var(--amber);
   background: linear-gradient(180deg, #fff9ed, #fff);
-  box-shadow: 0 16px 36px rgba(169, 106, 0, 0.14);
+  box-shadow: 0 6px 18px rgba(169, 106, 0, 0.07);
 }
 
 .metric-alert.metric-clickable:hover {
   border-color: rgba(169, 106, 0, 0.62);
-  box-shadow: 0 18px 38px rgba(169, 106, 0, 0.18);
+  box-shadow: 0 10px 24px rgba(169, 106, 0, 0.11);
 }
 
 .metric-alert.is-attention .metric-badge {
@@ -987,20 +987,21 @@ textarea {
 
 .lane {
   min-height: 280px;
-  border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.7);
   scroll-snap-align: start;
 }
 
 .lane.is-unassigned {
-  border-color: rgba(169, 106, 0, 0.3);
-  background: rgba(255, 241, 214, 0.45);
+  background: rgba(255, 241, 214, 0.32);
 }
 
 .lane.has-aging {
-  border-color: rgba(180, 35, 24, 0.28);
-  box-shadow: inset 4px 0 0 rgba(180, 35, 24, 0.62);
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.lane.is-unassigned.has-aging {
+  background: rgba(255, 241, 214, 0.32);
 }
 
 .lane-header {
@@ -1149,7 +1150,6 @@ textarea {
   display: grid;
   gap: 10px;
   border: 1px solid var(--line);
-  border-left: 4px solid var(--green);
   border-radius: 8px;
   background: #fff;
   padding: 12px;
@@ -1158,37 +1158,31 @@ textarea {
 
 .pr-card:hover {
   border-color: var(--line-strong);
-  border-left-color: var(--green);
   box-shadow: 0 10px 24px rgba(22, 32, 51, 0.09);
 }
 
-.pr-card.is-draft {
-  border-left-color: var(--blue);
-}
-
-.pr-card.is-stale {
-  border-left-color: var(--amber);
-}
-
 .pr-card.pr-age-green {
-  border-left-color: var(--green);
   background:
-    linear-gradient(135deg, rgba(18, 128, 92, 0.13), rgba(18, 128, 92, 0.04) 40%, rgba(255, 255, 255, 0) 72%),
+    linear-gradient(135deg, rgba(18, 128, 92, 0.07), rgba(18, 128, 92, 0.025) 42%, rgba(255, 255, 255, 0) 76%),
     #fff;
 }
 
 .pr-card.pr-age-yellow {
-  border-left-color: var(--amber);
   background:
-    linear-gradient(135deg, rgba(169, 106, 0, 0.16), rgba(169, 106, 0, 0.05) 42%, rgba(255, 255, 255, 0) 74%),
+    linear-gradient(135deg, rgba(169, 106, 0, 0.08), rgba(169, 106, 0, 0.028) 42%, rgba(255, 255, 255, 0) 76%),
     #fff;
 }
 
 .pr-card.pr-age-red {
-  border-left-color: var(--red);
   background:
-    linear-gradient(135deg, rgba(180, 35, 24, 0.16), rgba(180, 35, 24, 0.06) 42%, rgba(255, 255, 255, 0) 74%),
+    linear-gradient(135deg, rgba(180, 35, 24, 0.09), rgba(180, 35, 24, 0.032) 42%, rgba(255, 255, 255, 0) 76%),
     #fff;
+}
+
+.card-gradients-off .pr-card.pr-age-green,
+.card-gradients-off .pr-card.pr-age-yellow,
+.card-gradients-off .pr-card.pr-age-red {
+  background: #fff;
 }
 
 .pr-meta {
@@ -1203,8 +1197,9 @@ textarea {
 
 .pr-title {
   color: var(--ink);
-  font-weight: 800;
-  line-height: 1.28;
+  font-size: 0.96rem;
+  font-weight: 700;
+  line-height: 1.26;
   overflow-wrap: anywhere;
 }
 

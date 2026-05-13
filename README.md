@@ -37,11 +37,13 @@ CoW Triage shows **current requested-review load**, not historical reviewer outp
 3. Click **Aging reviews** to jump to PRs open for more than 14 days.
 4. Click **No reviewer requested** to focus unassigned PRs.
 5. Use **Clear filters** to reset target/status/age while keeping the selected repo.
-6. Open **Settings** to change draft visibility, auto-refresh, or GitHub token.
+6. Open **Settings** to change card gradients, draft visibility, auto-refresh, or GitHub token.
 
 ## 🔐 GitHub Token Safety
 
-A token is optional for public PRs, but useful to avoid rate limits and required to see org team review requests reliably.
+A token is optional for public PRs, but useful to avoid rate limits and required to see org team review requests and private repos reliably.
+
+Without a token, CoW Triage only sees public GitHub data. With a token, it can only show private repositories your GitHub account is already allowed to access.
 
 Use a **fine-grained token** for `cowprotocol` with only:
 

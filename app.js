@@ -18,6 +18,7 @@
     ageFilter: "all",
     sortMode: "priority",
     autoRefreshMinutes: DEFAULT_AUTO_REFRESH_MINUTES,
+    cardGradients: true,
     hideDrafts: true
   };
 
@@ -68,6 +69,7 @@
     clearFiltersButton: document.getElementById("clearFiltersButton"),
     settingsMenu: document.getElementById("settingsMenu"),
     settingsCloseButton: document.getElementById("settingsCloseButton"),
+    cardGradientsInput: document.getElementById("cardGradientsInput"),
     hideDraftsInput: document.getElementById("hideDraftsInput"),
     autoRefreshSelect: document.getElementById("autoRefreshSelect"),
     tokenInput: document.getElementById("tokenInput"),
@@ -188,6 +190,12 @@
       state.config.reviewerFilter = "unassigned";
       saveConfig(state.config);
       render();
+    });
+
+    els.cardGradientsInput.addEventListener("change", function () {
+      state.config.cardGradients = els.cardGradientsInput.checked;
+      saveConfig(state.config);
+      applyCardGradientPreference(state.config.cardGradients);
     });
 
     els.hideDraftsInput.addEventListener("change", function () {
@@ -427,6 +435,7 @@
       ageFilter: ageFilter,
       sortMode: sortFromUrl !== null ? normalizeSortMode(sortFromUrl) : normalizeSortMode(config.sortMode),
       autoRefreshMinutes: normalizeAutoRefreshMinutes(config.autoRefreshMinutes),
+      cardGradients: config.cardGradients !== false,
       hideDrafts: hideDrafts
     };
   }
@@ -516,8 +525,10 @@
 
   function hydrateForm() {
     els.tokenInput.value = loadToken();
+    els.cardGradientsInput.checked = state.config.cardGradients !== false;
     els.hideDraftsInput.checked = state.config.hideDrafts;
     els.autoRefreshSelect.value = String(state.config.autoRefreshMinutes);
+    applyCardGradientPreference(state.config.cardGradients);
     updateTokenSaveState();
   }
 
@@ -535,6 +546,7 @@
       ageFilter: normalizeAgeFilter(state.config.ageFilter),
       sortMode: normalizeSortMode(els.sortSelect.value || state.config.sortMode),
       autoRefreshMinutes: normalizeAutoRefreshMinutes(els.autoRefreshSelect.value),
+      cardGradients: els.cardGradientsInput.checked,
       hideDrafts: els.hideDraftsInput.checked
     };
   }
@@ -619,6 +631,12 @@
   function normalizeSortMode(value) {
     var key = String(value || "priority").trim().toLowerCase();
     return ["priority", "oldest", "recently-updated", "newest"].indexOf(key) >= 0 ? key : "priority";
+  }
+
+  function applyCardGradientPreference(value) {
+    var enabled = value !== false;
+    document.body.classList.toggle("card-gradients-off", !enabled);
+    els.cardGradientsInput.checked = enabled;
   }
 
   async function refreshRepositories() {
@@ -804,6 +822,7 @@
 
   function render() {
     var model = buildWorkloadModel(state.pulls, state.config);
+    applyCardGradientPreference(state.config.cardGradients);
     renderRepoOptions();
     renderReviewerFilterOptions(model);
     renderStatusFilterOptions(model);
@@ -1312,6 +1331,7 @@
   function renderSortOptions(model) {
     els.sortSelect.value = model.selectedSort;
     els.sortSelect.disabled = !model.openPrCount;
+    els.cardGradientsInput.checked = state.config.cardGradients !== false;
     els.hideDraftsInput.checked = model.hideDrafts;
   }
 
