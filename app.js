@@ -36,6 +36,8 @@
   };
 
   var els = {
+    brandMooButton: document.getElementById("brandMooButton"),
+    mooSound: document.getElementById("mooSound"),
     board: document.getElementById("board"),
     boardScrollTop: document.getElementById("boardScrollTop"),
     boardScrollTopInner: document.getElementById("boardScrollTopInner"),
@@ -95,6 +97,8 @@
   configureAutoRefresh();
 
   function bindEvents() {
+    els.brandMooButton.addEventListener("click", triggerMooEasterEgg);
+
     els.refreshButton.addEventListener("click", function () {
       state.config = readForm();
       saveConfig(state.config);
@@ -1684,6 +1688,74 @@
 
   function isAgingPull(pull) {
     return !pull.draft && getPullAgeLevel(pull) === "red";
+  }
+
+  function triggerMooEasterEgg() {
+    playMooSound();
+    explodeCowIcons();
+  }
+
+  function playMooSound() {
+    if (!els.mooSound) {
+      return;
+    }
+
+    try {
+      els.mooSound.pause();
+      els.mooSound.currentTime = 0;
+      var playPromise = els.mooSound.play();
+      if (playPromise && typeof playPromise.catch === "function") {
+        playPromise.catch(function () {});
+      }
+    } catch (_error) {
+      return;
+    }
+  }
+
+  function explodeCowIcons() {
+    var rect = els.brandMooButton.getBoundingClientRect();
+    var originX = rect.left + rect.width / 2;
+    var originY = rect.top + rect.height / 2;
+    var reducedMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var count = reducedMotion ? 12 : 42;
+    var viewportWidth = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
+    var viewportHeight = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);
+
+    for (var index = 0; index < count; index += 1) {
+      var particle = document.createElement("span");
+      var targetX = randomBetween(18, Math.max(18, viewportWidth - 18));
+      var targetY = randomBetween(18, Math.max(18, viewportHeight - 18));
+      var duration = reducedMotion ? 700 : randomBetween(950, 1650);
+      var delay = reducedMotion ? 0 : randomBetween(0, 130);
+
+      particle.className = "cow-particle";
+      particle.setAttribute("aria-hidden", "true");
+      particle.textContent = index % 8 === 0 ? "🐄" : "🐮";
+      particle.style.left = originX + "px";
+      particle.style.top = originY + "px";
+      particle.style.setProperty("--tx", targetX - originX + "px");
+      particle.style.setProperty("--ty", targetY - originY + "px");
+      particle.style.setProperty("--rot", randomBetween(-540, 540) + "deg");
+      particle.style.setProperty("--scale", randomBetween(0.78, 1.42).toFixed(2));
+      particle.style.setProperty("--size", randomBetween(20, 42) + "px");
+      particle.style.setProperty("--duration", duration + "ms");
+      particle.style.setProperty("--delay", delay + "ms");
+
+      document.body.appendChild(particle);
+      removeElementAfter(particle, duration + delay + 120);
+    }
+  }
+
+  function randomBetween(min, max) {
+    return Math.random() * (max - min) + min;
+  }
+
+  function removeElementAfter(element, delay) {
+    window.setTimeout(function () {
+      if (element.parentNode) {
+        element.parentNode.removeChild(element);
+      }
+    }, delay);
   }
 
   function getPullAgePriority(pull) {

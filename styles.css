@@ -65,6 +65,37 @@ a {
   min-width: 0;
 }
 
+.brand-mark-button {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 52px;
+  height: 52px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.brand-mark-button:hover {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Ctext y='24' font-size='24'%3E%F0%9F%90%AE%3C/text%3E%3C/svg%3E") 16 16, pointer;
+}
+
+.brand-mark-button:focus-visible {
+  outline: 3px solid rgba(34, 90, 214, 0.22);
+  outline-offset: 3px;
+}
+
+.brand-mark-button:hover .brand-mark {
+  box-shadow: 0 10px 22px rgba(18, 128, 92, 0.2);
+  transform: translateY(-1px) rotate(-2deg);
+}
+
+.brand-mark-button:active .brand-mark {
+  transform: scale(0.96) rotate(2deg);
+}
+
 .brand-mark {
   width: 52px;
   height: 52px;
@@ -72,15 +103,19 @@ a {
   border-radius: 8px;
   background: #61d4f2;
   object-fit: cover;
+  transition: box-shadow 160ms ease, transform 160ms ease;
 }
 
 .brand-title-row {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
 }
 
 .version-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   border: 1px solid var(--line);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.72);
@@ -89,6 +124,24 @@ a {
   font-weight: 800;
   line-height: 1;
   padding: 3px 6px;
+  text-decoration: none;
+}
+
+.version-repo-link:hover {
+  border-color: rgba(34, 90, 214, 0.32);
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.version-repo-link:focus-visible {
+  outline: 3px solid rgba(34, 90, 214, 0.18);
+  outline-offset: 2px;
+}
+
+.version-badge svg {
+  width: 12px;
+  height: 12px;
+  fill: currentColor;
 }
 
 .brand-tagline {
@@ -217,14 +270,14 @@ select:focus,
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  align-self: end;
-  min-height: 40px;
-  border: 0;
-  background: transparent;
+  min-height: 30px;
+  border: 1px solid rgba(34, 90, 214, 0.2);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
   color: var(--blue);
   cursor: pointer;
   font-weight: 800;
-  padding: 0 2px;
+  padding: 0 9px;
 }
 
 .clear-filters-icon {
@@ -238,7 +291,8 @@ select:focus,
 }
 
 .clear-filters-button:hover {
-  text-decoration: underline;
+  border-color: rgba(34, 90, 214, 0.42);
+  background: var(--blue-soft);
 }
 
 .clear-filters-button[hidden] {
@@ -827,6 +881,13 @@ textarea {
   min-width: min(720px, 100%);
 }
 
+.board-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .board-controls {
   display: flex;
   align-items: end;
@@ -1255,6 +1316,41 @@ textarea {
   border-color: rgba(18, 128, 92, 0.26);
   background: var(--green-soft);
   color: var(--green);
+}
+
+.cow-particle {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 1000;
+  pointer-events: none;
+  font-size: var(--size, 28px);
+  line-height: 1;
+  filter: drop-shadow(0 8px 12px rgba(22, 32, 51, 0.18));
+  transform: translate(-50%, -50%) scale(0.35);
+  animation: cow-burst var(--duration, 1200ms) cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: var(--delay, 0ms);
+  will-change: transform, opacity;
+}
+
+@keyframes cow-burst {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.35) rotate(0deg);
+  }
+
+  12% {
+    opacity: 1;
+  }
+
+  72% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(var(--scale, 1)) rotate(var(--rot));
+  }
 }
 
 @media (max-width: 1040px) {
