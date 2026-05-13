@@ -523,7 +523,7 @@
       els.repoPickerHint.title = state.reposError;
     } else {
       els.repoPickerHint.textContent = state.repos.length
-        ? String(state.repos.length) + " repos"
+        ? String(state.repos.length) + " repos in " + ORG_OWNER
         : "";
       els.repoPickerHint.title = "";
     }

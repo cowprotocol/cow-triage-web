@@ -399,20 +399,6 @@ textarea {
   outline-offset: 2px;
 }
 
-.crumb-org {
-  flex: 0 0 auto;
-  padding-left: 10px;
-  color: var(--ink);
-  font-weight: 800;
-}
-
-.crumb-separator {
-  flex: 0 0 auto;
-  padding: 0 2px 0 8px;
-  color: var(--muted);
-  font-weight: 800;
-}
-
 .repo-select {
   min-width: 120px;
   border: 0;
