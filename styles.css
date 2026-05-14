@@ -909,6 +909,10 @@ textarea {
   min-width: 150px;
 }
 
+.filter-control-search {
+  min-width: 180px;
+}
+
 .filter-control-age {
   justify-content: end;
   min-width: 0;

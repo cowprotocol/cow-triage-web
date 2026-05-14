@@ -29,6 +29,7 @@
     reposError: "",
     repoRequestId: 0,
     reviewerFilterOptions: [],
+    boardSearch: "",
     pulls: [],
     loading: false,
     lastUpdated: null,
@@ -66,6 +67,7 @@
     reviewerFilterOptions: document.getElementById("reviewerFilterOptions"),
     statusFilterSelect: document.getElementById("statusFilterSelect"),
     sortSelect: document.getElementById("sortSelect"),
+    boardSearchInput: document.getElementById("boardSearchInput"),
     clearFiltersButton: document.getElementById("clearFiltersButton"),
     settingsMenu: document.getElementById("settingsMenu"),
     settingsCloseButton: document.getElementById("settingsCloseButton"),
@@ -163,6 +165,11 @@
       render();
     });
 
+    els.boardSearchInput.addEventListener("input", function () {
+      state.boardSearch = els.boardSearchInput.value;
+      render();
+    });
+
     els.ageFilterButtons.forEach(function (button) {
       button.addEventListener("click", function () {
         var nextFilter = normalizeAgeFilter(button.getAttribute("data-age-filter"));
@@ -176,6 +183,8 @@
       state.config.reviewerFilter = "all";
       state.config.statusFilter = "all";
       state.config.ageFilter = "all";
+      state.boardSearch = "";
+      els.boardSearchInput.value = "";
       saveConfig(state.config);
       render();
     });
@@ -345,6 +354,8 @@
     state.config = readForm();
     state.config.repo = nextRepo;
     state.config.reviewerFilter = "all";
+    state.boardSearch = "";
+    els.boardSearchInput.value = "";
     state.pulls = [];
     state.lastUpdated = null;
     saveConfig(state.config);
@@ -596,6 +607,10 @@
   function normalizeAgeFilter(value) {
     var key = String(value || "all").trim().toLowerCase();
     return ["all", "green", "yellow", "red", "draft"].indexOf(key) >= 0 ? key : "all";
+  }
+
+  function normalizeBoardSearch(value) {
+    return String(value || "").trim().replace(/\s+/g, " ").toLowerCase();
   }
 
   function normalizeAutoRefreshMinutes(value) {
@@ -854,6 +869,9 @@
     if (model.selectedAge !== "all") {
       appendMetaPart("Age ", getAgeFilterLabel(model.selectedAge), "");
     }
+    if (model.selectedSearch) {
+      appendMetaPart("Search ", "\"" + model.selectedSearch + "\"", " · " + model.matchingPrCount + " matches");
+    }
     if (model.hideDrafts && model.hiddenDraftCount) {
       appendMetaPart("", model.hiddenDraftCount, " drafts hidden");
     }
@@ -977,6 +995,7 @@
     var selectedStatus = normalizeStatusFilter(config.statusFilter);
     var selectedAge = normalizeAgeFilter(config.ageFilter);
     var selectedSort = normalizeSortMode(config.sortMode);
+    var selectedSearch = normalizeBoardSearch(state.boardSearch);
     var modelPulls = hideDrafts ? pulls.filter(function (pull) {
       return !pull.draft;
     }) : pulls;
@@ -1026,8 +1045,8 @@
     });
 
     var selectedFilter = resolveReviewTargetFilter(config.reviewerFilter, reviewerByLogin, teamBySlug, noTeamReviewer.length);
-    var visiblePulls = filterPullsByAge(filterPullsByStatus(modelPulls, selectedStatus), selectedAge);
-    var visibleNoTeamReviewer = filterPullsByAge(filterPullsByStatus(noTeamReviewer, selectedStatus), selectedAge);
+    var visiblePulls = filterPullsBySearch(filterPullsByAge(filterPullsByStatus(modelPulls, selectedStatus), selectedAge), selectedSearch, pullTeamMatches);
+    var visibleNoTeamReviewer = filterPullsBySearch(filterPullsByAge(filterPullsByStatus(noTeamReviewer, selectedStatus), selectedAge), selectedSearch, pullTeamMatches);
     var lanes = buildLanesForFilter(selectedFilter, visiblePulls, reviewerOptions, reviewerByLogin, teamOptions, pullTeamMatches, visibleNoTeamReviewer, selectedSort);
 
     var assignmentCount = modelPulls.reduce(function (total, pull) {
@@ -1046,6 +1065,7 @@
       selectedStatus: selectedStatus,
       selectedAge: selectedAge,
       selectedSort: selectedSort,
+      selectedSearch: selectedSearch,
       hideDrafts: hideDrafts,
       hiddenDraftCount: pulls.length - modelPulls.length,
       statusCounts: buildStatusCounts(modelPulls),
@@ -1053,6 +1073,7 @@
       assignmentCount: assignmentCount,
       agingReviewCount: agingPulls.length,
       oldestAgingDays: oldestAgingDays,
+      matchingPrCount: visiblePulls.length,
       unassignedCount: noTeamReviewer.length,
       teamMatches: pullTeamMatches
     };
@@ -1064,7 +1085,6 @@
         return createPersonLane(reviewer.login.toLowerCase(), pulls, reviewerByLogin, sortMode);
       });
       personLanes.sort(sortLanesByUrgency);
-      var lanes = personLanes.slice();
       var knownTeamSlugs = new Set(teamOptions.map(function (team) {
         return String(team.slug || "").toLowerCase();
       }));
@@ -1073,7 +1093,7 @@
         return createTeamLane(String(team.slug || "").toLowerCase(), pulls, teamOptions, pullTeamMatches, sortMode);
       });
       teamLanes.sort(sortLanesByUrgency);
-      lanes = lanes.concat(teamLanes);
+      var lanes = teamLanes.slice();
 
       var unknownTeamItems = pulls.filter(function (pull) {
         return pullTeamMatches.get(pull.number).some(function (team) {
@@ -1091,6 +1111,7 @@
         }, unknownTeamItems, sortMode));
       }
 
+      lanes = lanes.concat(personLanes);
       lanes.push(createUnassignedLane(noTeamReviewer, sortMode));
       return lanes;
     }
@@ -1343,6 +1364,7 @@
   function renderSortOptions(model) {
     els.sortSelect.value = model.selectedSort;
     els.sortSelect.disabled = !model.openPrCount;
+    els.boardSearchInput.disabled = !model.openPrCount;
     els.cardGradientsInput.checked = state.config.cardGradients !== false;
     els.hideDraftsInput.checked = model.hideDrafts;
   }
@@ -1363,7 +1385,7 @@
   }
 
   function hasActiveFilters(model) {
-    return model.selectedFilter !== "all" || model.selectedStatus !== "all" || model.selectedAge !== "all";
+    return model.selectedFilter !== "all" || model.selectedStatus !== "all" || model.selectedAge !== "all" || Boolean(model.selectedSearch);
   }
 
   function renderMetrics(model) {
@@ -1379,6 +1401,17 @@
 
   function renderBoard(model) {
     els.board.replaceChildren();
+
+    if (model.selectedSearch && !model.lanes.some(function (lane) {
+      return lane.items.length > 0;
+    })) {
+      var noMatch = document.createElement("div");
+      noMatch.className = "empty-state";
+      noMatch.textContent = "No matching PRs";
+      els.board.appendChild(noMatch);
+      updateBoardScrollbar();
+      return;
+    }
 
     if (!model.lanes.length) {
       var empty = document.createElement("div");
@@ -1658,6 +1691,44 @@
     return pulls.filter(function (pull) {
       return getPullAgeCategory(pull) === ageFilter;
     });
+  }
+
+  function filterPullsBySearch(pulls, query, pullTeamMatches) {
+    var cleanQuery = normalizeBoardSearch(query);
+    if (!cleanQuery) {
+      return pulls;
+    }
+    var terms = cleanQuery.split(" ").filter(Boolean);
+    return pulls.filter(function (pull) {
+      var haystack = getPullSearchText(pull, pullTeamMatches.get(pull.number) || []);
+      return terms.every(function (term) {
+        return haystack.indexOf(term) >= 0;
+      });
+    });
+  }
+
+  function getPullSearchText(pull, teamMatches) {
+    var parts = [
+      String(pull.number || ""),
+      "#" + String(pull.number || ""),
+      pull.title || "",
+      pull.body || "",
+      pull.user && pull.user.login ? pull.user.login : "",
+      pull.head && pull.head.ref ? pull.head.ref : "",
+      pull.base && pull.base.ref ? pull.base.ref : ""
+    ];
+
+    getReviewers(pull).forEach(function (reviewer) {
+      parts.push(reviewer.login || "");
+    });
+    teamMatches.forEach(function (team) {
+      parts.push(team.slug || "", team.name || "", ORG_OWNER + "/" + (team.slug || ""));
+    });
+    getLabels(pull).forEach(function (label) {
+      parts.push(label.name || "");
+    });
+
+    return parts.join(" ").toLowerCase();
   }
 
   function buildStatusCounts(pulls) {

@@ -16,7 +16,8 @@
 - 🚦 Highlights PR age: green `<7d`, yellow `7-14d`, red `>14d`.
 - 🔥 Surfaces aging reviews, oldest PRs per lane, and no-reviewer PRs.
 - 🧭 Defaults to `cowprotocol/cowswap`, with searchable repo switching.
-- 🔎 Filters by age, reviewer/team, status, and sort mode.
+- 🔎 Filters by age, reviewer/team, status, sort mode, and free-text PR search.
+- 👥 Shows requested GitHub team lanes first when team data is available.
 - 🔗 Keeps filters in the URL so views are easy to share.
 - 💤 Hides draft PRs by default, including from counts and metrics.
 - 🔁 Auto-refreshes on a configurable interval.
@@ -33,10 +34,10 @@ CoW Triage shows **current requested-review load**, not historical reviewer outp
 ## 🕹️ How To Use
 
 1. Pick a repo from the searchable repo selector.
-2. Use the age, reviewer/team, status, and sort filters to narrow the board.
+2. Use the age, reviewer/team, status, sort, and search filters to narrow the board.
 3. Click **Aging reviews** to jump to PRs open for more than 14 days.
 4. Click **No reviewer requested** to focus unassigned PRs.
-5. Use **Clear filters** to reset target/status/age while keeping the selected repo.
+5. Use **Clear filters** to reset target/status/age/search while keeping the selected repo.
 6. Open **Settings** to change card gradients, draft visibility, auto-refresh, or GitHub token.
 
 ## 🔐 GitHub Token Safety
