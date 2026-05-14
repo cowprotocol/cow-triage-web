@@ -1065,18 +1065,30 @@
       });
       personLanes.sort(sortLanesByUrgency);
       var lanes = personLanes.slice();
+      var knownTeamSlugs = new Set(teamOptions.map(function (team) {
+        return String(team.slug || "").toLowerCase();
+      }));
 
-      var teamItems = pulls.filter(function (pull) {
-        return pullTeamMatches.get(pull.number).length > 0;
+      var teamLanes = teamOptions.map(function (team) {
+        return createTeamLane(String(team.slug || "").toLowerCase(), pulls, teamOptions, pullTeamMatches, sortMode);
+      });
+      teamLanes.sort(sortLanesByUrgency);
+      lanes = lanes.concat(teamLanes);
+
+      var unknownTeamItems = pulls.filter(function (pull) {
+        return pullTeamMatches.get(pull.number).some(function (team) {
+          var slug = String(team.slug || "").toLowerCase();
+          return !slug || !knownTeamSlugs.has(slug);
+        });
       });
 
-      if (teamItems.length) {
+      if (unknownTeamItems.length) {
         lanes.push(createLaneModel({
           type: "team",
           title: "Team requests",
-          subtitle: "requested teams",
+          subtitle: "unknown teams",
           avatarUrl: ""
-        }, teamItems, sortMode));
+        }, unknownTeamItems, sortMode));
       }
 
       lanes.push(createUnassignedLane(noTeamReviewer, sortMode));

@@ -12,7 +12,7 @@
 
 ## ✨ What It Does
 
-- 🧑‍💻 Groups open PRs by requested reviewer, requested team, or no reviewer requested.
+- 🧑‍💻 Groups open PRs by requested reviewer, requested GitHub team, or no reviewer requested.
 - 🚦 Highlights PR age: green `<7d`, yellow `7-14d`, red `>14d`.
 - 🔥 Surfaces aging reviews, oldest PRs per lane, and no-reviewer PRs.
 - 🧭 Defaults to `cowprotocol/cowswap`, with searchable repo switching.
