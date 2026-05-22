@@ -15,6 +15,7 @@
     repo: "cowswap",
     reviewerFilter: "all",
     statusFilter: "all",
+    reviewNeedFilter: "all",
     ageFilter: "all",
     sortMode: "priority",
     autoRefreshMinutes: DEFAULT_AUTO_REFRESH_MINUTES,
@@ -30,6 +31,7 @@
     repoRequestId: 0,
     reviewerFilterOptions: [],
     boardSearch: "",
+    viewer: null,
     pulls: [],
     loading: false,
     lastUpdated: null,
@@ -58,6 +60,9 @@
     repoSearchInput: document.getElementById("repoSearchInput"),
     repoOptions: document.getElementById("repoOptions"),
     repoPickerHint: document.getElementById("repoPickerHint"),
+    viewerBadge: document.getElementById("viewerBadge"),
+    viewerAvatar: document.getElementById("viewerAvatar"),
+    viewerLogin: document.getElementById("viewerLogin"),
     reviewerFilterSelect: document.getElementById("reviewerFilterSelect"),
     reviewerFilterCombobox: document.getElementById("reviewerFilterCombobox"),
     reviewerFilterButton: document.getElementById("reviewerFilterButton"),
@@ -66,6 +71,7 @@
     reviewerFilterSearchInput: document.getElementById("reviewerFilterSearchInput"),
     reviewerFilterOptions: document.getElementById("reviewerFilterOptions"),
     statusFilterSelect: document.getElementById("statusFilterSelect"),
+    reviewNeedSelect: document.getElementById("reviewNeedSelect"),
     sortSelect: document.getElementById("sortSelect"),
     boardSearchInput: document.getElementById("boardSearchInput"),
     clearFiltersButton: document.getElementById("clearFiltersButton"),
@@ -159,6 +165,12 @@
       render();
     });
 
+    els.reviewNeedSelect.addEventListener("change", function () {
+      state.config.reviewNeedFilter = normalizeReviewNeedFilter(els.reviewNeedSelect.value);
+      saveConfig(state.config);
+      render();
+    });
+
     els.sortSelect.addEventListener("change", function () {
       state.config.sortMode = normalizeSortMode(els.sortSelect.value);
       saveConfig(state.config);
@@ -182,6 +194,7 @@
     els.clearFiltersButton.addEventListener("click", function () {
       state.config.reviewerFilter = "all";
       state.config.statusFilter = "all";
+      state.config.reviewNeedFilter = "all";
       state.config.ageFilter = "all";
       state.boardSearch = "";
       els.boardSearchInput.value = "";
@@ -415,6 +428,7 @@
     var repoFromUrl = getRepoFromUrl();
     var targetFromUrl = getUrlParam("target");
     var statusFromUrl = getUrlParam("status");
+    var reviewNeedFromUrl = getUrlParam("review");
     var ageFromUrl = getUrlParam("age");
     var sortFromUrl = getUrlParam("sort");
     var draftsFromUrl = getUrlParam("drafts");
@@ -443,6 +457,7 @@
       repo: repoFromUrl || cleanRepoPart(config.repo || defaults.repo) || defaults.repo,
       reviewerFilter: targetFromUrl !== null ? normalizeFilterValue(targetFromUrl) : normalizeFilterValue(config.reviewerFilter),
       statusFilter: statusFilter,
+      reviewNeedFilter: reviewNeedFromUrl !== null ? normalizeReviewNeedFilter(reviewNeedFromUrl) : normalizeReviewNeedFilter(config.reviewNeedFilter),
       ageFilter: ageFilter,
       sortMode: sortFromUrl !== null ? normalizeSortMode(sortFromUrl) : normalizeSortMode(config.sortMode),
       autoRefreshMinutes: normalizeAutoRefreshMinutes(config.autoRefreshMinutes),
@@ -470,6 +485,7 @@
       var cleanRepo = cleanRepoPart(config.repo) || defaults.repo;
       setOptionalUrlParam(url, "target", normalizeFilterValue(config.reviewerFilter), "all");
       setOptionalUrlParam(url, "status", normalizeStatusFilter(config.statusFilter), "all");
+      setOptionalUrlParam(url, "review", normalizeReviewNeedFilter(config.reviewNeedFilter), "all");
       setOptionalUrlParam(url, "age", normalizeAgeFilter(config.ageFilter), "all");
       url.searchParams.set("repo", cleanRepo);
       url.searchParams.set("sort", normalizeSortMode(config.sortMode));
@@ -554,6 +570,7 @@
       repo: resolveRepoValue(els.repoSelect.value),
       reviewerFilter: normalizeFilterValue(els.reviewerFilterSelect.value || state.config.reviewerFilter),
       statusFilter: normalizeStatusFilter(els.statusFilterSelect.value || state.config.statusFilter),
+      reviewNeedFilter: normalizeReviewNeedFilter(els.reviewNeedSelect.value || state.config.reviewNeedFilter),
       ageFilter: normalizeAgeFilter(state.config.ageFilter),
       sortMode: normalizeSortMode(els.sortSelect.value || state.config.sortMode),
       autoRefreshMinutes: normalizeAutoRefreshMinutes(els.autoRefreshSelect.value),
@@ -602,6 +619,11 @@
   function normalizeStatusFilter(value) {
     var key = String(value || "all").trim().toLowerCase();
     return ["all", "ready", "draft", "stale"].indexOf(key) >= 0 ? key : "all";
+  }
+
+  function normalizeReviewNeedFilter(value) {
+    var key = String(value || "all").trim().toLowerCase();
+    return ["all", "needs-review", "needs-my-attention", "enough-approvals", "has-review-activity"].indexOf(key) >= 0 ? key : "all";
   }
 
   function normalizeAgeFilter(value) {
@@ -689,14 +711,23 @@
     setMessage("");
     setStatus("Loading", "loading");
     els.refreshButton.disabled = true;
+    render();
 
     try {
-      var pulls = await fetchOpenPulls(config, loadToken());
+      var token = loadToken();
+      var viewer = await fetchViewer(token);
+      if (requestId !== state.dashboardRequestId) {
+        return;
+      }
+      state.viewer = viewer;
+      render();
+      var pulls = await fetchOpenPulls(config, token, viewer);
       if (requestId !== state.dashboardRequestId) {
         return;
       }
       state.pulls = pulls;
       state.lastUpdated = new Date();
+      state.loading = false;
       render();
       setStatus("Updated " + formatClock(state.lastUpdated), "ok");
       setUpdatedTooltip();
@@ -707,6 +738,7 @@
       var message = error.message || "GitHub request failed.";
       setMessage(message, shouldShowSettingsAction(message));
       setStatus("Error", "error");
+      state.loading = false;
       render();
     } finally {
       if (requestId === state.dashboardRequestId) {
@@ -758,7 +790,31 @@
       });
   }
 
-  async function fetchOpenPulls(config, token) {
+  async function fetchViewer(token) {
+    if (!token) {
+      return null;
+    }
+
+    try {
+      var response = await window.fetch("https://api.github.com/user", {
+        headers: buildGitHubHeaders(token),
+        cache: "no-store"
+      });
+      var payload = await parseResponse(response);
+      if (!response.ok || !payload || !payload.login) {
+        return null;
+      }
+      return {
+        login: payload.login,
+        avatar_url: payload.avatar_url || "",
+        html_url: payload.html_url || "https://github.com/" + payload.login
+      };
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  async function fetchOpenPulls(config, token, viewer) {
     var pulls = [];
     var page = 1;
     var headers = buildGitHubHeaders(token);
@@ -786,7 +842,193 @@
       page += 1;
     }
 
-    return pulls;
+    return hydratePullReviewState(pulls, config, token, viewer);
+  }
+
+  async function hydratePullReviewState(pulls, config, token, viewer) {
+    var headers = buildGitHubHeaders(token);
+    return mapWithConcurrency(pulls, 6, async function (pull) {
+      var reviewData = await Promise.all([
+        fetchPullReviews(config.repo, pull.number, headers),
+        fetchPullIssue(config.repo, pull.number, headers).catch(function () {
+          return {};
+        })
+      ]);
+      var issueCommentCount = Number((reviewData[1] && reviewData[1].comments) || pull.comments || 0);
+      var reviewCommentCount = Number(pull.review_comments || 0);
+      var commentData = await Promise.all([
+        viewer && issueCommentCount > 0 ? fetchIssueComments(config.repo, pull.number, headers).catch(function () {
+          return [];
+        }) : Promise.resolve([]),
+        viewer && reviewCommentCount > 0 ? fetchPullReviewComments(config.repo, pull.number, headers).catch(function () {
+          return [];
+        }) : Promise.resolve([])
+      ]);
+      return Object.assign({}, pull, {
+        review_state: buildPullReviewState(pull, reviewData[0], reviewData[1], commentData[0], commentData[1], viewer)
+      });
+    });
+  }
+
+  async function fetchPullReviews(repo, number, headers) {
+    var reviews = [];
+    var page = 1;
+
+    while (true) {
+      var url = new URL("https://api.github.com/repos/" + encodeURIComponent(ORG_OWNER) + "/" + encodeURIComponent(repo) + "/pulls/" + encodeURIComponent(number) + "/reviews");
+      url.searchParams.set("per_page", "100");
+      url.searchParams.set("page", String(page));
+
+      var response = await window.fetch(url.toString(), {
+        headers: headers,
+        cache: "no-store"
+      });
+
+      var payload = await parseResponse(response);
+      if (!response.ok) {
+        throw new Error(buildGitHubError(response, payload, repo + "/pull/" + number + "/reviews"));
+      }
+
+      reviews = reviews.concat(Array.isArray(payload) ? payload : []);
+      if (!Array.isArray(payload) || payload.length < 100) {
+        break;
+      }
+      page += 1;
+    }
+
+    return reviews;
+  }
+
+  async function fetchPullIssue(repo, number, headers) {
+    var url = new URL("https://api.github.com/repos/" + encodeURIComponent(ORG_OWNER) + "/" + encodeURIComponent(repo) + "/issues/" + encodeURIComponent(number));
+    var response = await window.fetch(url.toString(), {
+      headers: headers,
+      cache: "no-store"
+    });
+    var payload = await parseResponse(response);
+    if (!response.ok) {
+      throw new Error(buildGitHubError(response, payload, repo + "/issues/" + number));
+    }
+    return payload || {};
+  }
+
+  async function fetchIssueComments(repo, number, headers) {
+    var comments = [];
+    var page = 1;
+
+    while (true) {
+      var url = new URL("https://api.github.com/repos/" + encodeURIComponent(ORG_OWNER) + "/" + encodeURIComponent(repo) + "/issues/" + encodeURIComponent(number) + "/comments");
+      url.searchParams.set("per_page", "100");
+      url.searchParams.set("page", String(page));
+      var response = await window.fetch(url.toString(), {
+        headers: headers,
+        cache: "no-store"
+      });
+      var payload = await parseResponse(response);
+      if (!response.ok) {
+        throw new Error(buildGitHubError(response, payload, repo + "/issues/" + number + "/comments"));
+      }
+      comments = comments.concat(Array.isArray(payload) ? payload : []);
+      if (!Array.isArray(payload) || payload.length < 100) {
+        break;
+      }
+      page += 1;
+    }
+
+    return comments;
+  }
+
+  async function fetchPullReviewComments(repo, number, headers) {
+    var comments = [];
+    var page = 1;
+
+    while (true) {
+      var url = new URL("https://api.github.com/repos/" + encodeURIComponent(ORG_OWNER) + "/" + encodeURIComponent(repo) + "/pulls/" + encodeURIComponent(number) + "/comments");
+      url.searchParams.set("per_page", "100");
+      url.searchParams.set("page", String(page));
+      var response = await window.fetch(url.toString(), {
+        headers: headers,
+        cache: "no-store"
+      });
+      var payload = await parseResponse(response);
+      if (!response.ok) {
+        throw new Error(buildGitHubError(response, payload, repo + "/pull/" + number + "/comments"));
+      }
+      comments = comments.concat(Array.isArray(payload) ? payload : []);
+      if (!Array.isArray(payload) || payload.length < 100) {
+        break;
+      }
+      page += 1;
+    }
+
+    return comments;
+  }
+
+  function buildPullReviewState(pull, reviews, issue, issueComments, reviewComments, viewer) {
+    var latestByUser = new Map();
+    var viewerLogin = viewer && viewer.login ? viewer.login.toLowerCase() : "";
+    reviews.forEach(function (review) {
+      var login = review.user && review.user.login ? review.user.login.toLowerCase() : "";
+      if (!login) {
+        return;
+      }
+      var previous = latestByUser.get(login);
+      var reviewTime = new Date(review.submitted_at || review.updated_at || 0).getTime();
+      var previousTime = previous ? new Date(previous.submitted_at || previous.updated_at || 0).getTime() : 0;
+      if (!previous || reviewTime >= previousTime) {
+        latestByUser.set(login, review);
+      }
+    });
+
+    var latestReviews = Array.from(latestByUser.values());
+    var approvalCount = latestReviews.filter(function (review) {
+      return review.state === "APPROVED";
+    }).length;
+    var changesRequestedCount = latestReviews.filter(function (review) {
+      return review.state === "CHANGES_REQUESTED";
+    }).length;
+    var issueCommentCount = Number((issue && issue.comments) || pull.comments || 0);
+    var reviewCommentCount = Number(pull.review_comments || 0);
+    var viewerLatestReview = viewerLogin ? latestByUser.get(viewerLogin) : null;
+    var viewerCommented = Boolean(viewerLogin) && (
+      commentsIncludeUser(issueComments, viewerLogin) ||
+      commentsIncludeUser(reviewComments, viewerLogin) ||
+      reviews.some(function (review) {
+        return review.user && String(review.user.login || "").toLowerCase() === viewerLogin && Boolean(String(review.body || "").trim());
+      })
+    );
+    var viewerReviewed = Boolean(viewerLatestReview);
+
+    return {
+      approvalCount: approvalCount,
+      changesRequestedCount: changesRequestedCount,
+      reviewCount: reviews.length,
+      issueCommentCount: issueCommentCount,
+      reviewCommentCount: reviewCommentCount,
+      hasReviewActivity: reviews.length > 0 || issueCommentCount > 0 || reviewCommentCount > 0,
+      viewerParticipated: viewerReviewed || viewerCommented,
+      viewerReviewState: viewerLatestReview ? viewerLatestReview.state : ""
+    };
+  }
+
+  function commentsIncludeUser(comments, login) {
+    return Array.isArray(comments) && comments.some(function (comment) {
+      return comment.user && String(comment.user.login || "").toLowerCase() === login;
+    });
+  }
+
+  async function mapWithConcurrency(items, limit, mapper) {
+    var results = new Array(items.length);
+    var nextIndex = 0;
+    var workers = Array.from({ length: Math.min(limit, items.length) }, async function () {
+      while (nextIndex < items.length) {
+        var index = nextIndex;
+        nextIndex += 1;
+        results[index] = await mapper(items[index], index);
+      }
+    });
+    await Promise.all(workers);
+    return results;
   }
 
   function buildGitHubHeaders(token) {
@@ -838,9 +1080,11 @@
   function render() {
     var model = buildWorkloadModel(state.pulls, state.config);
     applyCardGradientPreference(state.config.cardGradients);
+    renderViewer();
     renderRepoOptions();
     renderReviewerFilterOptions(model);
     renderStatusFilterOptions(model);
+    renderReviewNeedOptions(model);
     renderSortOptions(model);
     renderAgeLegend(model);
     renderClearFilters(model);
@@ -850,8 +1094,29 @@
     renderBoardMeta(model);
   }
 
+  function renderViewer() {
+    if (!state.viewer || !state.viewer.login) {
+      els.viewerBadge.hidden = true;
+      els.viewerBadge.removeAttribute("href");
+      els.viewerAvatar.removeAttribute("src");
+      els.viewerLogin.textContent = "";
+      return;
+    }
+
+    els.viewerBadge.hidden = false;
+    els.viewerBadge.href = state.viewer.html_url || "https://github.com/" + state.viewer.login;
+    els.viewerBadge.title = "GitHub token user: @" + state.viewer.login;
+    els.viewerAvatar.src = state.viewer.avatar_url || "";
+    els.viewerLogin.textContent = "@" + state.viewer.login;
+  }
+
   function renderBoardMeta(model) {
     els.boardMeta.replaceChildren();
+
+    if (state.loading && !state.lastUpdated) {
+      els.boardMeta.textContent = "Fetching GitHub data";
+      return;
+    }
 
     if (!state.lastUpdated) {
       els.boardMeta.textContent = "Waiting for GitHub";
@@ -864,7 +1129,10 @@
       appendMetaPart("Filtered to ", getFilterLabel(model.selectedFilter, model), "");
     }
     if (model.selectedStatus !== "all") {
-      appendMetaPart("Status ", model.selectedStatus, "");
+      appendMetaPart("Activity ", getActivityFilterLabel(model.selectedStatus), "");
+    }
+    if (model.selectedReviewNeed !== "all") {
+      appendMetaPart("Review need ", getReviewNeedLabel(model.selectedReviewNeed), "");
     }
     if (model.selectedAge !== "all") {
       appendMetaPart("Age ", getAgeFilterLabel(model.selectedAge), "");
@@ -913,6 +1181,39 @@
       return "Draft";
     }
     return "All";
+  }
+
+  function getActivityFilterLabel(value) {
+    if (value === "ready") {
+      return "Recently updated";
+    }
+    if (value === "stale") {
+      return "Stale";
+    }
+    if (value === "draft") {
+      return "Draft";
+    }
+    return "All activity";
+  }
+
+  function getReviewNeedLabel(value) {
+    if (value === "needs-review") {
+      return "Needs review";
+    }
+    if (value === "needs-my-attention") {
+      return "Needs my attention" + getViewerLabelSuffix();
+    }
+    if (value === "enough-approvals") {
+      return "Has enough approvals";
+    }
+    if (value === "has-review-activity") {
+      return "Has review activity";
+    }
+    return "All review states";
+  }
+
+  function getViewerLabelSuffix() {
+    return state.viewer && state.viewer.login ? " (@" + state.viewer.login + ")" : "";
   }
 
   function renderRepoOptions() {
@@ -993,6 +1294,10 @@
   function buildWorkloadModel(pulls, config) {
     var hideDrafts = config.hideDrafts !== false;
     var selectedStatus = normalizeStatusFilter(config.statusFilter);
+    var selectedReviewNeed = normalizeReviewNeedFilter(config.reviewNeedFilter);
+    if (selectedReviewNeed === "needs-my-attention" && !getViewerLogin()) {
+      selectedReviewNeed = "all";
+    }
     var selectedAge = normalizeAgeFilter(config.ageFilter);
     var selectedSort = normalizeSortMode(config.sortMode);
     var selectedSearch = normalizeBoardSearch(state.boardSearch);
@@ -1045,8 +1350,8 @@
     });
 
     var selectedFilter = resolveReviewTargetFilter(config.reviewerFilter, reviewerByLogin, teamBySlug, noTeamReviewer.length);
-    var visiblePulls = filterPullsBySearch(filterPullsByAge(filterPullsByStatus(modelPulls, selectedStatus), selectedAge), selectedSearch, pullTeamMatches);
-    var visibleNoTeamReviewer = filterPullsBySearch(filterPullsByAge(filterPullsByStatus(noTeamReviewer, selectedStatus), selectedAge), selectedSearch, pullTeamMatches);
+    var visiblePulls = filterPullsBySearch(filterPullsByReviewNeed(filterPullsByAge(filterPullsByStatus(modelPulls, selectedStatus), selectedAge), selectedReviewNeed), selectedSearch, pullTeamMatches);
+    var visibleNoTeamReviewer = filterPullsBySearch(filterPullsByReviewNeed(filterPullsByAge(filterPullsByStatus(noTeamReviewer, selectedStatus), selectedAge), selectedReviewNeed), selectedSearch, pullTeamMatches);
     var lanes = buildLanesForFilter(selectedFilter, visiblePulls, reviewerOptions, reviewerByLogin, teamOptions, pullTeamMatches, visibleNoTeamReviewer, selectedSort);
 
     var assignmentCount = modelPulls.reduce(function (total, pull) {
@@ -1063,12 +1368,14 @@
       teamCounts: teamCounts,
       selectedFilter: selectedFilter,
       selectedStatus: selectedStatus,
+      selectedReviewNeed: selectedReviewNeed,
       selectedAge: selectedAge,
       selectedSort: selectedSort,
       selectedSearch: selectedSearch,
       hideDrafts: hideDrafts,
       hiddenDraftCount: pulls.length - modelPulls.length,
       statusCounts: buildStatusCounts(modelPulls),
+      reviewNeedCounts: buildReviewNeedCounts(modelPulls),
       openPrCount: modelPulls.length,
       assignmentCount: assignmentCount,
       agingReviewCount: agingPulls.length,
@@ -1166,8 +1473,8 @@
   function createUnassignedLane(items, sortMode) {
     return createLaneModel({
       type: "unassigned",
-      title: "No reviewer requested",
-      subtitle: "needs assignment",
+      title: "No active review request",
+      subtitle: "no current requested reviewer/team",
       avatarUrl: ""
     }, items, sortMode);
   }
@@ -1220,7 +1527,7 @@
 
   function getFilterLabel(value, model) {
     if (value === "unassigned") {
-      return "No reviewer requested";
+      return "No active review request";
     }
     if (value.indexOf("user:") === 0) {
       return "@" + getReviewerLogin(value.slice(5), model.reviewerOptions);
@@ -1264,7 +1571,7 @@
     }
 
     if (model.unassignedCount > 0) {
-      addReviewerFilterOption("unassigned", "No reviewer requested (" + model.unassignedCount + ")", "Other");
+      addReviewerFilterOption("unassigned", "No active review request (" + model.unassignedCount + ")", "Other");
     }
 
     state.reviewerFilterOptions = options;
@@ -1345,8 +1652,8 @@
   }
 
   function renderStatusFilterOptions(model) {
-    setStatusOptionText("all", "All statuses (" + model.openPrCount + ")");
-    setStatusOptionText("ready", "Ready (" + model.statusCounts.ready + ")");
+    setStatusOptionText("all", "All activity (" + model.openPrCount + ")");
+    setStatusOptionText("ready", "Recently updated (" + model.statusCounts.ready + ")");
     setStatusOptionText("draft", model.hideDrafts ? "Draft (hidden)" : "Draft (" + model.statusCounts.draft + ")", model.hideDrafts);
     setStatusOptionText("stale", "Stale (" + model.statusCounts.stale + ")");
     els.statusFilterSelect.value = model.selectedStatus;
@@ -1355,6 +1662,30 @@
 
   function setStatusOptionText(value, text, disabled) {
     var option = els.statusFilterSelect.querySelector("option[value=\"" + value + "\"]");
+    if (option) {
+      option.textContent = text;
+      option.disabled = Boolean(disabled);
+    }
+  }
+
+  function renderReviewNeedOptions(model) {
+    setReviewNeedOptionText("all", "All review states (" + model.openPrCount + ")");
+    setReviewNeedOptionText("needs-review", "Needs review (" + model.reviewNeedCounts.needsReview + ")");
+    setReviewNeedOptionText(
+      "needs-my-attention",
+      state.viewer && state.viewer.login
+        ? "Needs my attention (@" + state.viewer.login + ") (" + model.reviewNeedCounts.needsMyAttention + ")"
+        : "Needs my attention (token required)",
+      !state.viewer || !state.viewer.login
+    );
+    setReviewNeedOptionText("enough-approvals", "Has enough approvals (" + model.reviewNeedCounts.enoughApprovals + ")");
+    setReviewNeedOptionText("has-review-activity", "Has review activity (" + model.reviewNeedCounts.hasReviewActivity + ")");
+    els.reviewNeedSelect.value = model.selectedReviewNeed;
+    els.reviewNeedSelect.disabled = !model.openPrCount;
+  }
+
+  function setReviewNeedOptionText(value, text, disabled) {
+    var option = els.reviewNeedSelect.querySelector("option[value=\"" + value + "\"]");
     if (option) {
       option.textContent = text;
       option.disabled = Boolean(disabled);
@@ -1385,7 +1716,7 @@
   }
 
   function hasActiveFilters(model) {
-    return model.selectedFilter !== "all" || model.selectedStatus !== "all" || model.selectedAge !== "all" || Boolean(model.selectedSearch);
+    return model.selectedFilter !== "all" || model.selectedStatus !== "all" || model.selectedReviewNeed !== "all" || model.selectedAge !== "all" || Boolean(model.selectedSearch);
   }
 
   function renderMetrics(model) {
@@ -1396,11 +1727,17 @@
     els.agingBadge.textContent = model.agingReviewCount > 0 ? "Oldest " + model.oldestAgingDays + "d" : "Clear";
     els.unassignedCount.textContent = String(model.unassignedCount);
     els.unassignedMetric.classList.toggle("is-attention", model.unassignedCount > 0);
-    els.unassignedBadge.textContent = model.unassignedCount > 0 ? "Needs reviewer" : "Clear";
+    els.unassignedBadge.textContent = model.unassignedCount > 0 ? "Needs request" : "Clear";
   }
 
   function renderBoard(model) {
     els.board.replaceChildren();
+
+    if (state.loading && !state.pulls.length) {
+      els.board.appendChild(createBoardLoader());
+      updateBoardScrollbar();
+      return;
+    }
 
     if (model.selectedSearch && !model.lanes.some(function (lane) {
       return lane.items.length > 0;
@@ -1427,6 +1764,44 @@
     });
 
     updateBoardScrollbar();
+  }
+
+  function createBoardLoader() {
+    var loader = document.createElement("div");
+    loader.className = "board-loader";
+
+    var spinner = document.createElement("span");
+    spinner.className = "board-loader-spinner";
+    spinner.setAttribute("aria-hidden", "true");
+
+    var copy = document.createElement("div");
+    var title = document.createElement("strong");
+    title.textContent = "Loading review workload";
+    var detail = document.createElement("span");
+    detail.textContent = "Fetching open PRs, requested reviewers, review states, approvals, and comments from GitHub.";
+    copy.append(title, detail);
+    if (loadToken()) {
+      copy.appendChild(createLoaderViewer());
+    }
+    loader.append(spinner, copy);
+    return loader;
+  }
+
+  function createLoaderViewer() {
+    var viewer = document.createElement("span");
+    viewer.className = "board-loader-viewer";
+
+    if (state.viewer && state.viewer.login) {
+      var avatar = document.createElement("img");
+      avatar.alt = "";
+      avatar.src = state.viewer.avatar_url || "";
+      viewer.appendChild(avatar);
+      viewer.appendChild(document.createTextNode("Using GitHub token as @" + state.viewer.login));
+      return viewer;
+    }
+
+    viewer.textContent = "Checking GitHub token user...";
+    return viewer;
   }
 
   function updateBoardScrollbar() {
@@ -1581,6 +1956,8 @@
       tags.appendChild(createTag("Stale", "tag-stale"));
     }
 
+    appendReviewStateTags(tags, pull);
+
     teamMatches.forEach(function (team) {
       tags.appendChild(createTag(team.slug, "tag-team"));
     });
@@ -1614,6 +1991,18 @@
     tag.className = "tag " + className;
     tag.textContent = text;
     return tag;
+  }
+
+  function appendReviewStateTags(tags, pull) {
+    var reviewState = getPullReviewState(pull);
+    if (reviewState.approvalCount > 0) {
+      tags.appendChild(createTag(reviewState.approvalCount + " " + pluralize("approval", reviewState.approvalCount), reviewState.approvalCount >= 2 ? "tag-approval" : "tag-review"));
+    }
+    if (reviewState.changesRequestedCount > 0) {
+      tags.appendChild(createTag("changes requested", "tag-changes"));
+    } else if (reviewState.approvalCount === 0 && reviewState.hasReviewActivity) {
+      tags.appendChild(createTag("review activity", "tag-review"));
+    }
   }
 
   function createLabelTag(label) {
@@ -1693,6 +2082,27 @@
     });
   }
 
+  function filterPullsByReviewNeed(pulls, reviewNeed) {
+    if (reviewNeed === "all") {
+      return pulls;
+    }
+    return pulls.filter(function (pull) {
+      if (reviewNeed === "needs-review") {
+        return isPullNeedingReview(pull);
+      }
+      if (reviewNeed === "needs-my-attention") {
+        return isPullNeedingMyAttention(pull);
+      }
+      if (reviewNeed === "enough-approvals") {
+        return hasEnoughApprovals(pull);
+      }
+      if (reviewNeed === "has-review-activity") {
+        return hasReviewActivity(pull);
+      }
+      return true;
+    });
+  }
+
   function filterPullsBySearch(pulls, query, pullTeamMatches) {
     var cleanQuery = normalizeBoardSearch(query);
     if (!cleanQuery) {
@@ -1727,6 +2137,22 @@
     getLabels(pull).forEach(function (label) {
       parts.push(label.name || "");
     });
+    var reviewState = getPullReviewState(pull);
+    if (reviewState.approvalCount > 0) {
+      parts.push(String(reviewState.approvalCount) + " approvals");
+    }
+    if (reviewState.changesRequestedCount > 0) {
+      parts.push("changes requested");
+    }
+    if (reviewState.hasReviewActivity) {
+      parts.push("review activity");
+    }
+    if (reviewState.viewerParticipated) {
+      parts.push("reviewed by me");
+    }
+    if (isPullNeedingMyAttention(pull)) {
+      parts.push("needs my attention");
+    }
 
     return parts.join(" ").toLowerCase();
   }
@@ -1739,6 +2165,29 @@
       ready: 0,
       draft: 0,
       stale: 0
+    });
+  }
+
+  function buildReviewNeedCounts(pulls) {
+    return pulls.reduce(function (counts, pull) {
+      if (isPullNeedingReview(pull)) {
+        counts.needsReview += 1;
+      }
+      if (isPullNeedingMyAttention(pull)) {
+        counts.needsMyAttention += 1;
+      }
+      if (hasEnoughApprovals(pull)) {
+        counts.enoughApprovals += 1;
+      }
+      if (hasReviewActivity(pull)) {
+        counts.hasReviewActivity += 1;
+      }
+      return counts;
+    }, {
+      needsReview: 0,
+      needsMyAttention: 0,
+      enoughApprovals: 0,
+      hasReviewActivity: 0
     });
   }
 
@@ -1791,6 +2240,52 @@
 
   function isAgingPull(pull) {
     return !pull.draft && getPullAgeLevel(pull) === "red";
+  }
+
+  function getPullReviewState(pull) {
+    return pull.review_state || {
+      approvalCount: 0,
+      changesRequestedCount: 0,
+      reviewCount: 0,
+      issueCommentCount: 0,
+      reviewCommentCount: 0,
+      hasReviewActivity: false,
+      viewerParticipated: false,
+      viewerReviewState: ""
+    };
+  }
+
+  function hasEnoughApprovals(pull) {
+    return getPullReviewState(pull).approvalCount >= 2;
+  }
+
+  function hasReviewActivity(pull) {
+    return getPullReviewState(pull).hasReviewActivity;
+  }
+
+  function isPullNeedingReview(pull) {
+    return !pull.draft && !hasEnoughApprovals(pull);
+  }
+
+  function isPullNeedingMyAttention(pull) {
+    return isPullNeedingReview(pull) && Boolean(getViewerLogin()) && !isViewerAuthor(pull) && hasActiveReviewRequest(pull) && !getPullReviewState(pull).viewerParticipated;
+  }
+
+  function getViewerLogin() {
+    return state.viewer && state.viewer.login ? state.viewer.login.toLowerCase() : "";
+  }
+
+  function hasActiveReviewRequest(pull) {
+    return getReviewers(pull).length > 0 || getRequestedTeams(pull).length > 0;
+  }
+
+  function isViewerAuthor(pull) {
+    var viewerLogin = getViewerLogin();
+    return Boolean(viewerLogin) && pull.user && String(pull.user.login || "").toLowerCase() === viewerLogin;
+  }
+
+  function pluralize(word, count) {
+    return count === 1 ? word : word + "s";
   }
 
   function triggerMooEasterEgg() {

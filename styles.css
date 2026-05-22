@@ -229,6 +229,40 @@ h2 {
   background: var(--red-soft);
 }
 
+.viewer-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  padding: 3px 10px 3px 4px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.viewer-badge:hover {
+  border-color: rgba(34, 90, 214, 0.32);
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.viewer-badge img {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel-soft);
+}
+
+.viewer-badge[hidden] {
+  display: none;
+}
+
 .button {
   min-height: 40px;
   border: 1px solid var(--line-strong);
@@ -874,11 +908,12 @@ textarea {
   align-items: start;
   justify-content: space-between;
   gap: 18px;
+  flex-wrap: wrap;
   margin: 24px 0 12px;
 }
 
 .board-heading {
-  min-width: min(720px, 100%);
+  min-width: 0;
 }
 
 .board-title-row {
@@ -889,11 +924,12 @@ textarea {
 }
 
 .board-controls {
-  display: flex;
+  display: grid;
   align-items: end;
-  justify-content: flex-end;
+  flex: 1 1 100%;
+  width: 100%;
+  grid-template-columns: auto minmax(220px, 1.25fr) minmax(150px, 0.9fr) minmax(190px, 1fr) minmax(140px, 0.8fr) minmax(190px, 1fr);
   gap: 16px;
-  flex-wrap: wrap;
 }
 
 .filter-control {
@@ -905,12 +941,151 @@ textarea {
   font-weight: 650;
 }
 
+.filter-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.help-icon {
+  display: inline-grid;
+  place-items: center;
+  position: relative;
+  width: 17px;
+  height: 17px;
+  color: var(--muted);
+  cursor: help;
+  outline: none;
+}
+
+.help-icon:hover,
+.help-icon:focus-visible {
+  color: var(--blue);
+}
+
+.help-icon-svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.25;
+}
+
+.tooltip-content {
+  position: absolute;
+  top: calc(100% + 9px);
+  left: 50%;
+  z-index: 60;
+  display: grid;
+  gap: 7px;
+  width: min(292px, calc(100vw - 40px));
+  border: 1px solid rgba(196, 204, 216, 0.92);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 14px 34px rgba(22, 32, 51, 0.16);
+  color: var(--ink);
+  font-size: 0.72rem;
+  font-weight: 560;
+  line-height: 1.3;
+  opacity: 0;
+  padding: 10px;
+  pointer-events: none;
+  text-align: left;
+  transform: translate(-50%, -2px);
+  transition: opacity 120ms ease, transform 120ms ease, visibility 120ms ease;
+  visibility: hidden;
+  white-space: normal;
+}
+
+.tooltip-wide {
+  width: min(340px, calc(100vw - 40px));
+}
+
+.tooltip-title {
+  display: block;
+  color: var(--ink);
+  font-size: 0.72rem;
+  font-weight: 850;
+  letter-spacing: 0;
+}
+
+.tooltip-row {
+  display: grid;
+  grid-template-columns: minmax(84px, 0.38fr) minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+}
+
+.tooltip-row strong {
+  color: var(--blue);
+  font-weight: 820;
+}
+
+.tooltip-row span {
+  color: var(--muted);
+  font-weight: 560;
+}
+
+.tooltip-content::before {
+  content: "";
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  border-top: 1px solid rgba(196, 204, 216, 0.92);
+  border-left: 1px solid rgba(196, 204, 216, 0.92);
+  background: rgba(255, 255, 255, 0.98);
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.help-icon:hover .tooltip-content,
+.help-icon:focus-visible .tooltip-content {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  visibility: visible;
+}
+
+.filter-control-age .tooltip-content {
+  left: 0;
+  transform: translate(0, -2px);
+}
+
+.filter-control-age .tooltip-content::before {
+  left: 10px;
+  transform: rotate(45deg);
+}
+
+.filter-control-age .help-icon:hover .tooltip-content,
+.filter-control-age .help-icon:focus-visible .tooltip-content {
+  transform: translate(0, 0);
+}
+
+.filter-control-search .tooltip-content {
+  right: 0;
+  left: auto;
+  transform: translate(0, -2px);
+}
+
+.filter-control-search .tooltip-content::before {
+  right: 10px;
+  left: auto;
+  transform: rotate(45deg);
+}
+
+.filter-control-search .help-icon:hover .tooltip-content,
+.filter-control-search .help-icon:focus-visible .tooltip-content {
+  transform: translate(0, 0);
+}
+
 .filter-control-small {
   min-width: 150px;
 }
 
 .filter-control-search {
-  min-width: 180px;
+  min-width: 190px;
 }
 
 .filter-control-age {
@@ -1150,6 +1325,68 @@ textarea {
   font-weight: 700;
 }
 
+.board-loader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 300px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 10px 26px rgba(22, 32, 51, 0.06);
+  color: var(--muted);
+  padding: 22px;
+  grid-column: 1 / -1;
+  text-align: left;
+}
+
+.board-loader strong,
+.board-loader span {
+  display: block;
+}
+
+.board-loader strong {
+  color: var(--ink);
+  font-size: 1rem;
+  margin-bottom: 3px;
+}
+
+.board-loader .board-loader-viewer {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 750;
+}
+
+.board-loader .board-loader-viewer img {
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel-soft);
+}
+
+.board-loader-spinner {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  border: 3px solid var(--blue-soft);
+  border-top-color: var(--blue);
+  border-radius: 999px;
+  animation: spin 900ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .pr-card {
   display: grid;
   gap: 10px;
@@ -1317,6 +1554,24 @@ textarea {
   color: var(--green);
 }
 
+.tag-approval {
+  border-color: rgba(18, 128, 92, 0.26);
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.tag-review {
+  border-color: rgba(34, 90, 214, 0.22);
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.tag-changes {
+  border-color: rgba(180, 35, 24, 0.24);
+  background: var(--red-soft);
+  color: var(--red);
+}
+
 .cow-particle {
   position: fixed;
   left: 0;
@@ -1372,6 +1627,8 @@ textarea {
 
   .board-controls {
     align-items: stretch;
+    display: flex;
+    flex-wrap: wrap;
     justify-content: flex-start;
   }
 

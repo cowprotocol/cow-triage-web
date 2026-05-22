@@ -22,7 +22,7 @@
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M12 2C6.48 2 2 6.58 2 12.25c0 4.52 2.87 8.36 6.84 9.72.5.1.68-.22.68-.49 0-.24-.01-1.04-.01-1.89-2.78.62-3.37-1.22-3.37-1.22-.45-1.18-1.11-1.49-1.11-1.49-.91-.64.07-.63.07-.63 1 .07 1.53 1.06 1.53 1.06.9 1.57 2.35 1.12 2.92.86.09-.67.35-1.12.63-1.38-2.22-.26-4.55-1.14-4.55-5.05 0-1.12.39-2.03 1.03-2.74-.1-.26-.45-1.3.1-2.7 0 0 .84-.27 2.75 1.05A9.33 9.33 0 0 1 12 7.02c.85 0 1.7.12 2.5.35 1.9-1.32 2.74-1.05 2.74-1.05.55 1.4.2 2.44.1 2.7.64.71 1.03 1.62 1.03 2.74 0 3.92-2.34 4.78-4.57 5.04.36.32.68.94.68 1.9 0 1.38-.01 2.49-.01 2.82 0 .27.18.59.69.49A10.08 10.08 0 0 0 22 12.25C22 6.58 17.52 2 12 2Z"></path>
                 </svg>
-                <span>v0.4</span>
+                <span>v0.5</span>
               </a>
             </div>
             <p class="brand-tagline">Open PR review load across CoW Protocol repos.</p>
@@ -44,6 +44,10 @@
               </div>
             </div>
           </div>
+          <a id="viewerBadge" class="viewer-badge" href="#" target="_blank" rel="noreferrer" hidden>
+            <img id="viewerAvatar" alt="" aria-hidden="true">
+            <span id="viewerLogin"></span>
+          </a>
           <span id="statusPill" class="status-pill">Idle</span>
           <button id="refreshButton" class="button button-primary" type="button">Refresh</button>
           <details id="settingsMenu" class="settings-menu">
@@ -137,10 +141,10 @@
             </div>
             <strong id="agingReviewCount">0</strong>
           </article>
-          <article id="unassignedMetric" class="metric metric-alert metric-clickable" role="button" tabindex="0" aria-label="Filter to PRs with no reviewer requested" title="Filter to PRs with no reviewer requested">
+          <article id="unassignedMetric" class="metric metric-alert metric-clickable" role="button" tabindex="0" aria-label="Filter to PRs with no active requested reviewer or team" title="Filter to PRs with no current requested reviewer/team. This does not mean nobody ever reviewed or commented.">
             <div class="metric-title-row">
-              <span>No reviewer requested</span>
-              <span id="unassignedBadge" class="metric-badge">Needs reviewer</span>
+              <span>No active review request</span>
+              <span id="unassignedBadge" class="metric-badge">Needs request</span>
             </div>
             <strong id="unassignedCount">0</strong>
           </article>
@@ -165,7 +169,7 @@
           </div>
           <div class="board-controls">
             <div class="filter-control filter-control-age">
-              <span>Age</span>
+              <span class="filter-label">Age <span class="help-icon" tabindex="0" aria-label="Filters by how long a non-draft PR has been open."><svg class="help-icon-svg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v6"></path><path d="M12 7h.01"></path></svg><span class="tooltip-content" role="tooltip"><span class="tooltip-title">Age filters</span><span class="tooltip-row"><strong>&lt; 7d</strong><span>Newer PRs.</span></span><span class="tooltip-row"><strong>7-14d</strong><span>Getting old.</span></span><span class="tooltip-row"><strong>&gt; 14d</strong><span>Aging PRs that need priority.</span></span></span></span></span>
               <div class="age-legend" aria-label="PR age filter">
                 <button class="age-chip age-filter age-green" type="button" data-age-filter="green">&lt; 7d</button>
                 <button class="age-chip age-filter age-yellow" type="button" data-age-filter="yellow">7-14d</button>
@@ -174,7 +178,7 @@
               </div>
             </div>
             <div class="filter-control">
-              <span>Reviewer / team</span>
+              <span class="filter-label">Reviewer / team <span class="help-icon" tabindex="0" aria-label="Filters by current requested reviewer or team."><svg class="help-icon-svg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v6"></path><path d="M12 7h.01"></path></svg><span class="tooltip-content" role="tooltip"><span class="tooltip-title">Review target</span><span class="tooltip-row"><strong>People</strong><span>PRs currently requesting that reviewer.</span></span><span class="tooltip-row"><strong>Teams</strong><span>PRs currently requesting a GitHub team.</span></span><span class="tooltip-row"><strong>No request</strong><span>No active requested reviewer or team.</span></span></span></span></span>
               <input id="reviewerFilterSelect" name="reviewerFilter" type="hidden" value="all">
               <div id="reviewerFilterCombobox" class="search-select">
                 <button id="reviewerFilterButton" class="search-select-button" type="button" aria-label="Reviewer or team" aria-haspopup="listbox" aria-expanded="false" aria-controls="reviewerFilterOptions">
@@ -187,16 +191,26 @@
               </div>
             </div>
             <label class="filter-control filter-control-small">
-              <span>Status</span>
+              <span class="filter-label">Activity <span class="help-icon" tabindex="0" aria-label="Explains activity filter options."><svg class="help-icon-svg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v6"></path><path d="M12 7h.01"></path></svg><span class="tooltip-content" role="tooltip"><span class="tooltip-title">Activity filters</span><span class="tooltip-row"><strong>Recently updated</strong><span>Non-draft PR updated in the last 3 days.</span></span><span class="tooltip-row"><strong>Stale</strong><span>No updates for 3+ days.</span></span><span class="tooltip-row"><strong>Draft</strong><span>Draft PRs, when drafts are visible.</span></span></span></span></span>
               <select id="statusFilterSelect" name="statusFilter">
-                <option value="all">All statuses</option>
-                <option value="ready">Ready</option>
+                <option value="all">All activity</option>
+                <option value="ready">Recently updated</option>
                 <option value="draft">Draft</option>
                 <option value="stale">Stale</option>
               </select>
             </label>
             <label class="filter-control filter-control-small">
-              <span>Sort</span>
+              <span class="filter-label">Review need <span class="help-icon" tabindex="0" aria-label="Explains review need filter options."><svg class="help-icon-svg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v6"></path><path d="M12 7h.01"></path></svg><span class="tooltip-content tooltip-wide" role="tooltip"><span class="tooltip-title">Review need</span><span class="tooltip-row"><strong>Needs review</strong><span>Non-draft PRs with fewer than 2 approvals.</span></span><span class="tooltip-row"><strong>Needs my attention</strong><span>Requested PRs you did not author and have not reviewed or commented on.</span></span><span class="tooltip-row"><strong>Has enough approvals</strong><span>PRs with 2+ current approvals.</span></span><span class="tooltip-row"><strong>Has review activity</strong><span>Someone already reviewed, commented, or requested changes.</span></span></span></span></span>
+              <select id="reviewNeedSelect" name="reviewNeed">
+                <option value="all">All review states</option>
+                <option value="needs-review">Needs review</option>
+                <option value="needs-my-attention">Needs my attention</option>
+                <option value="enough-approvals">Has enough approvals</option>
+                <option value="has-review-activity">Has review activity</option>
+              </select>
+            </label>
+            <label class="filter-control filter-control-small">
+              <span class="filter-label">Sort <span class="help-icon" tabindex="0" aria-label="Explains sort options."><svg class="help-icon-svg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v6"></path><path d="M12 7h.01"></path></svg><span class="tooltip-content" role="tooltip"><span class="tooltip-title">Sort cards</span><span class="tooltip-row"><strong>Priority</strong><span>Age urgency first, then oldest PRs.</span></span><span class="tooltip-row"><strong>Oldest</strong><span>Oldest opened PRs first.</span></span><span class="tooltip-row"><strong>Recently updated</strong><span>Most recently changed PRs first.</span></span></span></span></span>
               <select id="sortSelect" name="sort">
                 <option value="priority">Priority</option>
                 <option value="oldest">Oldest</option>
@@ -205,7 +219,7 @@
               </select>
             </label>
             <label class="filter-control filter-control-search">
-              <span>Search</span>
+              <span class="filter-label">Search <span class="help-icon" tabindex="0" aria-label="Explains board search."><svg class="help-icon-svg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v6"></path><path d="M12 7h.01"></path></svg><span class="tooltip-content" role="tooltip"><span class="tooltip-title">Board search</span><span class="tooltip-row"><strong>Matches</strong><span>PR number, title, body, author, branches, labels, reviewers, teams, and review-state labels.</span></span></span></span></span>
               <input id="boardSearchInput" name="boardSearch" type="search" placeholder="Search PRs" autocomplete="off">
             </label>
           </div>

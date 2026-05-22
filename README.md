@@ -12,11 +12,13 @@
 
 ## ✨ What It Does
 
-- 🧑‍💻 Groups open PRs by requested reviewer, requested GitHub team, or no reviewer requested.
+- 🧑‍💻 Groups open PRs by requested reviewer, requested GitHub team, or no active review request.
 - 🚦 Highlights PR age: green `<7d`, yellow `7-14d`, red `>14d`.
-- 🔥 Surfaces aging reviews, oldest PRs per lane, and no-reviewer PRs.
+- 🔥 Surfaces aging reviews, oldest PRs per lane, and PRs with no active review request.
 - 🧭 Defaults to `cowprotocol/cowswap`, with searchable repo switching.
-- 🔎 Filters by age, reviewer/team, status, sort mode, and free-text PR search.
+- 🔎 Filters by age, reviewer/team, activity, review need, sort mode, and free-text PR search.
+- ✅ Shows review signals like approvals, changes requested, and review/comment activity.
+- 🙋 Shows a token-aware **Needs my attention** view for requested PRs you did not author and have not reviewed or commented on yet.
 - 👥 Shows requested GitHub team lanes first when team data is available.
 - 🔗 Keeps filters in the URL so views are easy to share.
 - 💤 Hides draft PRs by default, including from counts and metrics.
@@ -28,16 +30,16 @@ CoW Triage shows **current requested-review load**, not historical reviewer outp
 
 - Who currently has the most requested reviews?
 - Which queue has the oldest waiting PR?
-- Which PRs have no reviewer requested?
+- Which PRs have no active review request?
 - Which team review requests are aging?
 
 ## 🕹️ How To Use
 
 1. Pick a repo from the searchable repo selector.
-2. Use the age, reviewer/team, status, sort, and search filters to narrow the board.
+2. Use the age, reviewer/team, activity, review need, sort, and search filters to narrow the board.
 3. Click **Aging reviews** to jump to PRs open for more than 14 days.
-4. Click **No reviewer requested** to focus unassigned PRs.
-5. Use **Clear filters** to reset target/status/age/search while keeping the selected repo.
+4. Click **No active review request** to focus PRs with no current requested reviewer/team.
+5. Use **Clear filters** to reset target/activity/review need/age/search while keeping the selected repo.
 6. Open **Settings** to change card gradients, draft visibility, auto-refresh, or GitHub token.
 
 ## 🔐 GitHub Token Safety
@@ -58,7 +60,7 @@ Avoid classic tokens. Do **not** grant write, admin, workflow, code, or organiza
 Filters are reflected in the URL:
 
 ```text
-?repo=cowswap&target=team:frontend&status=ready&age=red&sort=priority&drafts=hide
+?repo=cowswap&target=team:frontend&status=ready&review=needs-review&age=red&sort=priority&drafts=hide
 ```
 
 Supported params:
@@ -66,6 +68,7 @@ Supported params:
 - `repo=cowswap`
 - `target=all | user:<handle> | team:<slug> | unassigned`
 - `status=all | ready | stale | draft`
+- `review=all | needs-review | needs-my-attention | enough-approvals | has-review-activity`
 - `age=all | green | yellow | red | draft`
 - `sort=priority | oldest | recently-updated | newest`
 - `drafts=hide | show`
