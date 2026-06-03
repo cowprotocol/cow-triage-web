@@ -5,6 +5,8 @@
   var TOKEN_KEY = "cow-web-dashboard-token-v1";
   var FIRST_RUN_NOTICE_KEY = "cow-web-dashboard-first-run-notice-dismissed-v1";
   var ORG_OWNER = "cowprotocol";
+  var BASE_TITLE = "CoW Triage";
+  var FAVICON_ICON_DATA_URL = "data:image/png;base64,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";
   var DEFAULT_AUTO_REFRESH_MINUTES = 15;
   var AUTO_REFRESH_MINUTE_OPTIONS = [0, 5, 10, 15, 30, 60];
   var WEEK_MS = 7 * 24 * 60 * 60 * 1000;
@@ -36,12 +38,16 @@
     loading: false,
     lastUpdated: null,
     dashboardRequestId: 0,
-    refreshTimerId: null
+    refreshTimerId: null,
+    faviconImage: null,
+    faviconReady: false,
+    faviconCount: null
   };
 
   var els = {
     brandMooButton: document.getElementById("brandMooButton"),
     mooSound: document.getElementById("mooSound"),
+    favicon: document.querySelector("link[rel=\"icon\"]"),
     board: document.getElementById("board"),
     boardScrollTop: document.getElementById("boardScrollTop"),
     boardScrollTopInner: document.getElementById("boardScrollTopInner"),
@@ -99,6 +105,7 @@
   bindEvents();
   bindBoardScroll();
   syncShareUrlParams(state.config);
+  preloadFaviconBase();
   renderFirstRunNotice();
   renderRepoOptions();
   render();
@@ -1092,6 +1099,79 @@
     renderBoard(model);
 
     renderBoardMeta(model);
+    renderDocumentMeta(model);
+  }
+
+  function renderDocumentMeta(model) {
+    var count = state.loading && !state.pulls.length ? null : model.matchingPrCount;
+    document.title = buildDocumentTitle(model, count);
+    renderFaviconBadge(count);
+  }
+
+  function buildDocumentTitle(model, count) {
+    var viewerSuffix = state.viewer && state.viewer.login ? " - @" + state.viewer.login : "";
+    if (count === null) {
+      return BASE_TITLE + viewerSuffix;
+    }
+    return BASE_TITLE + " (" + count + ")" + viewerSuffix;
+  }
+
+  function preloadFaviconBase() {
+    var image = new Image();
+    image.onload = function () {
+      state.faviconImage = image;
+      state.faviconReady = true;
+      if (state.faviconCount !== null) {
+        renderFaviconBadge(state.faviconCount);
+      }
+    };
+    image.src = FAVICON_ICON_DATA_URL;
+  }
+
+  function renderFaviconBadge(count) {
+    state.faviconCount = count;
+    if (!els.favicon) {
+      return;
+    }
+    if (!state.faviconReady || !state.faviconImage || count === null) {
+      els.favicon.href = FAVICON_ICON_DATA_URL;
+      return;
+    }
+
+    try {
+      var canvas = document.createElement("canvas");
+      canvas.width = 32;
+      canvas.height = 32;
+      var context = canvas.getContext("2d");
+      if (!context) {
+        els.favicon.href = FAVICON_ICON_DATA_URL;
+        return;
+      }
+
+      context.drawImage(state.faviconImage, 0, 0, 32, 32);
+
+      var badgeText = formatFaviconBadgeCount(count);
+      context.fillStyle = "#ffffff";
+      context.strokeStyle = "#163a8f";
+      context.lineJoin = "round";
+      context.textAlign = "right";
+      context.textBaseline = "top";
+      context.font = "bold " + (badgeText.length > 2 ? 16 : badgeText.length > 1 ? 21 : 25) + "px Arial, sans-serif";
+      context.lineWidth = badgeText.length > 2 ? 4 : 5;
+      context.strokeText(badgeText, 32, -1);
+      context.fillText(badgeText, 32, -1);
+
+      els.favicon.href = canvas.toDataURL("image/png");
+    } catch (_error) {
+      els.favicon.href = FAVICON_ICON_DATA_URL;
+    }
+  }
+
+  function formatFaviconBadgeCount(count) {
+    if (count > 99) {
+      return "99+";
+    }
+    return String(Math.max(0, count));
   }
 
   function renderViewer() {
@@ -1445,9 +1525,10 @@
 
     return createLaneModel({
       type: "person",
-      title: reviewer ? reviewer.login : handle,
-      subtitle: reviewer ? "@" + reviewer.login : "@" + handle,
-      avatarUrl: reviewer ? reviewer.avatar_url : ""
+      title: "@" + (reviewer ? reviewer.login : handle),
+      subtitle: "",
+      avatarUrl: reviewer ? reviewer.avatar_url : "",
+      profileUrl: reviewer ? (reviewer.html_url || "https://github.com/" + reviewer.login) : "https://github.com/" + handle
     }, items, sortMode);
   }
 
@@ -1827,22 +1908,30 @@
     var header = document.createElement("header");
     header.className = "lane-header";
 
-    var person = document.createElement("div");
-    person.className = "lane-person";
-    person.appendChild(createAvatar(lane));
-
     var titleWrap = document.createElement("div");
     var title = document.createElement("span");
     title.className = "lane-title";
     title.textContent = lane.title;
-    var subtitle = document.createElement("span");
-    subtitle.className = "lane-subtitle";
-    subtitle.textContent = lane.subtitle;
-    titleWrap.append(title, subtitle);
+    titleWrap.appendChild(title);
+    if (lane.subtitle) {
+      var subtitle = document.createElement("span");
+      subtitle.className = "lane-subtitle";
+      subtitle.textContent = lane.subtitle;
+      titleWrap.appendChild(subtitle);
+    }
     var breakdown = createLaneAgeBreakdown(lane.ageSummary);
     if (breakdown) {
       titleWrap.appendChild(breakdown);
     }
+    var person = document.createElement(lane.type === "person" && lane.profileUrl ? "a" : "div");
+    person.className = "lane-person";
+    if (lane.type === "person" && lane.profileUrl) {
+      person.href = lane.profileUrl;
+      person.target = "_blank";
+      person.rel = "noreferrer";
+      person.title = "Open " + lane.title + " on GitHub";
+    }
+    person.appendChild(createAvatar(lane));
     person.appendChild(titleWrap);
 
     var stats = document.createElement("div");
@@ -1938,11 +2027,22 @@
 
     var meta = document.createElement("div");
     meta.className = "pr-meta";
+    var metaLead = document.createElement("div");
+    metaLead.className = "pr-meta-lead";
     var number = document.createElement("span");
     number.textContent = "#" + pull.number;
+    var commentSummary = createCommentSummary(pull);
+    metaLead.appendChild(number);
+    if (commentSummary) {
+      metaLead.appendChild(createMetaDot());
+      metaLead.appendChild(commentSummary);
+    }
+    var metaAside = document.createElement("div");
+    metaAside.className = "pr-meta-aside";
     var updated = document.createElement("span");
     updated.textContent = formatRelative(pull.updated_at);
-    meta.append(number, updated);
+    metaAside.appendChild(updated);
+    meta.append(metaLead, metaAside);
 
     var title = document.createElement("div");
     title.className = "pr-title";
@@ -1968,22 +2068,126 @@
 
     var footer = document.createElement("div");
     footer.className = "pr-footer";
-    var author = document.createElement("span");
-    author.textContent = "by @" + (pull.user && pull.user.login ? pull.user.login : "unknown");
+    var footerMain = document.createElement("div");
+    footerMain.className = "pr-footer-main";
+    var author = createAuthorSummary(pull);
     var created = document.createElement("span");
     if (!pull.draft) {
       created.className = "age-chip age-" + getPullAgeLevel(pull);
     }
     created.textContent = "opened " + formatRelative(pull.created_at);
-    footer.append(author, created);
+    footerMain.append(author, created);
+    footer.appendChild(footerMain);
+    var associationTag = createAuthorAssociationTag(pull);
+    if (associationTag) {
+      var footerTags = document.createElement("div");
+      footerTags.className = "pr-footer-tags";
+      footerTags.appendChild(associationTag);
+      footer.appendChild(footerTags);
+    }
 
     card.append(meta, title);
     if (tags.childElementCount) {
       card.appendChild(tags);
     }
     card.appendChild(footer);
+    card.appendChild(createPullTooltip(pull, teamMatches));
 
     return card;
+  }
+
+  function createCommentSummary(pull) {
+    var totalComments = getPullCommentCount(pull);
+    if (totalComments <= 0) {
+      return null;
+    }
+
+    var summary = document.createElement("span");
+    summary.className = "pr-comments";
+    summary.setAttribute("aria-label", totalComments + " " + pluralize("comment", totalComments));
+    summary.title = totalComments + " " + pluralize("comment", totalComments);
+    summary.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.75 2.5h12.5c.41 0 .75.34.75.75v7.5a.75.75 0 0 1-.75.75H6.81l-3.2 2.4a.75.75 0 0 1-1.21-.6v-1.8h-.65A.75.75 0 0 1 1 10.75v-7.5c0-.41.34-.75.75-.75Z"></path></svg><span>' + totalComments + '</span>';
+    return summary;
+  }
+
+  function createMetaDot() {
+    var dot = document.createElement("span");
+    dot.className = "pr-meta-dot";
+    dot.textContent = "\u00b7";
+    return dot;
+  }
+
+  function createAuthorSummary(pull) {
+    var wrap = document.createElement("div");
+    wrap.className = "pr-author";
+
+    var avatar = document.createElement("img");
+    avatar.className = "pr-author-avatar";
+    avatar.alt = "";
+    avatar.loading = "lazy";
+    avatar.src = pull.user && pull.user.avatar_url ? pull.user.avatar_url : "";
+    wrap.appendChild(avatar);
+
+    var text = document.createElement("span");
+    text.className = "pr-author-text";
+    text.textContent = "@" + (pull.user && pull.user.login ? pull.user.login : "unknown");
+    wrap.appendChild(text);
+
+    return wrap;
+  }
+
+  function createAuthorAssociationTag(pull) {
+    var associationLabel = formatAuthorAssociation(pull.author_association);
+    if (!associationLabel || associationLabel === "Member") {
+      return null;
+    }
+    return createTag(associationLabel, "tag-author-association");
+  }
+
+  function createPullTooltip(pull, teamMatches) {
+    var reviewState = getPullReviewState(pull);
+    var tooltip = document.createElement("div");
+    tooltip.className = "tooltip-content tooltip-wide pr-card-tooltip";
+    tooltip.setAttribute("role", "tooltip");
+
+    var title = document.createElement("span");
+    title.className = "tooltip-title";
+    title.textContent = "PR details";
+    tooltip.appendChild(title);
+
+    var authorLogin = pull.user && pull.user.login ? "@" + pull.user.login : "unknown";
+    var authorAssociation = formatAuthorAssociation(pull.author_association);
+    var authorDetail = authorAssociation ? authorLogin + " (" + authorAssociation + ")" : authorLogin;
+    var requestedTargets = getReviewers(pull).map(function (reviewer) {
+      return "@" + reviewer.login;
+    }).concat(teamMatches.map(function (team) {
+      return "@" + ORG_OWNER + "/" + team.slug;
+    }));
+
+    tooltip.appendChild(createTooltipRow("Repository", getPullRepoName(pull)));
+    tooltip.appendChild(createTooltipRow("State", formatPullStateLabel(pull)));
+    tooltip.appendChild(createTooltipRow("Author", authorDetail));
+    tooltip.appendChild(createTooltipRow("Created", formatExactDateTime(pull.created_at)));
+    tooltip.appendChild(createTooltipRow("Updated", formatExactDateTime(pull.updated_at)));
+    tooltip.appendChild(createTooltipRow("Comments", formatCommentDetail(reviewState)));
+    tooltip.appendChild(createTooltipRow("Reviews", formatReviewDetail(reviewState)));
+    tooltip.appendChild(createTooltipRow("Requested", requestedTargets.length ? requestedTargets.join(", ") : "none"));
+    tooltip.appendChild(createTooltipRow("Branches", formatBranchDetail(pull)));
+
+    return tooltip;
+  }
+
+  function createTooltipRow(label, value) {
+    var row = document.createElement("span");
+    row.className = "tooltip-row";
+
+    var title = document.createElement("strong");
+    title.textContent = label;
+    var detail = document.createElement("span");
+    detail.textContent = value;
+
+    row.append(title, detail);
+    return row;
   }
 
   function createTag(text, className) {
@@ -2021,6 +2225,94 @@
       parseInt(hex.slice(2, 4), 16),
       parseInt(hex.slice(4, 6), 16)
     ];
+  }
+
+  function formatAuthorAssociation(association) {
+    var key = String(association || "").toUpperCase();
+    if (!key || key === "NONE" || key === "MANNEQUIN") {
+      return "";
+    }
+
+    var labels = {
+      COLLABORATOR: "Collaborator",
+      CONTRIBUTOR: "Contributor",
+      FIRST_TIMER: "First-time contributor",
+      FIRST_TIME_CONTRIBUTOR: "First-time contributor",
+      MEMBER: "Member",
+      OWNER: "Owner"
+    };
+
+    return labels[key] || key.toLowerCase().split("_").map(function (part) {
+      return part ? part.charAt(0).toUpperCase() + part.slice(1) : "";
+    }).join(" ");
+  }
+
+  function formatExactDateTime(value) {
+    if (!value) {
+      return "unknown";
+    }
+
+    var date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return "unknown";
+    }
+
+    return new Intl.DateTimeFormat(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      timeZoneName: "short"
+    }).format(date);
+  }
+
+  function formatPullStateLabel(pull) {
+    if (pull.draft) {
+      return "draft";
+    }
+    if (getPullStatus(pull) === "stale") {
+      return "stale";
+    }
+    return "active";
+  }
+
+  function formatCommentDetail(reviewState) {
+    var total = Number(reviewState.issueCommentCount || 0) + Number(reviewState.reviewCommentCount || 0);
+    if (total <= 0) {
+      return "none";
+    }
+    return total + " total (" + Number(reviewState.issueCommentCount || 0) + " issue, " + Number(reviewState.reviewCommentCount || 0) + " review)";
+  }
+
+  function formatReviewDetail(reviewState) {
+    if (!reviewState.reviewCount) {
+      return "none";
+    }
+
+    var parts = [];
+    if (reviewState.approvalCount > 0) {
+      parts.push(reviewState.approvalCount + " " + pluralize("approval", reviewState.approvalCount));
+    }
+    if (reviewState.changesRequestedCount > 0) {
+      parts.push(reviewState.changesRequestedCount + " changes requested");
+    }
+    parts.push(reviewState.reviewCount + " total " + pluralize("review", reviewState.reviewCount));
+    return parts.join(", ");
+  }
+
+  function getPullRepoName(pull) {
+    return (
+      pull.base &&
+      pull.base.repo &&
+      pull.base.repo.name
+    ) || state.config.repo || "unknown";
+  }
+
+  function formatBranchDetail(pull) {
+    var head = pull.head && pull.head.ref ? pull.head.ref : "unknown";
+    var base = pull.base && pull.base.ref ? pull.base.ref : "unknown";
+    return head + " -> " + base;
   }
 
   function sortPulls(items, sortMode) {
@@ -2253,6 +2545,11 @@
       viewerParticipated: false,
       viewerReviewState: ""
     };
+  }
+
+  function getPullCommentCount(pull) {
+    var reviewState = getPullReviewState(pull);
+    return Number(reviewState.issueCommentCount || 0) + Number(reviewState.reviewCommentCount || 0);
   }
 
   function hasEnoughApprovals(pull) {
