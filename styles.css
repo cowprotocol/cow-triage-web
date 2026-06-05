@@ -616,6 +616,13 @@ textarea {
   text-align: left;
 }
 
+.search-select-button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .search-select-button::after {
   position: absolute;
   right: 12px;
@@ -677,6 +684,9 @@ textarea {
 }
 
 .search-select-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   width: 100%;
   border: 0;
   border-radius: 6px;
@@ -686,6 +696,25 @@ textarea {
   font-weight: 700;
   padding: 8px 10px;
   text-align: left;
+}
+
+.search-select-option-indicator {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  color: var(--blue);
+  font-size: 0.72rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.search-select-option.is-selected .search-select-option-indicator {
+  border-color: rgba(34, 90, 214, 0.32);
+  background: rgba(34, 90, 214, 0.12);
 }
 
 .search-select-option:hover,
@@ -1409,6 +1438,21 @@ textarea {
   background: #fff;
   padding: 12px;
   text-decoration: none;
+}
+
+.pr-repo-band {
+  margin: -12px -12px 0;
+  border-bottom: 1px solid rgba(34, 90, 214, 0.14);
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+  background: rgba(34, 90, 214, 0.08);
+  color: var(--blue);
+  font-size: 0.72rem;
+  font-weight: 850;
+  letter-spacing: 0.01em;
+  padding: 5px 10px;
+  text-align: center;
+  text-transform: lowercase;
 }
 
 .pr-card:hover {

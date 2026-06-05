@@ -14,7 +14,7 @@
   var STALE_AFTER_MS = 3 * 24 * 60 * 60 * 1000;
 
   var defaults = {
-    repo: "cowswap",
+    repos: ["cowswap"],
     reviewerFilter: "all",
     statusFilter: "all",
     reviewNeedFilter: "all",
@@ -134,6 +134,11 @@
       handleMenuSearchKeydown(event, "repo");
     });
     els.repoOptions.addEventListener("click", function (event) {
+      var preset = event.target.closest("[data-preset]");
+      if (preset) {
+        applyRepoPreset(preset.getAttribute("data-preset"));
+        return;
+      }
       var option = event.target.closest("[data-value]");
       if (option) {
         selectRepo(option.getAttribute("data-value"));
@@ -361,18 +366,51 @@
   }
 
   function selectRepo(value) {
-    var nextRepo = resolveRepoValue(value);
-    els.repoSelect.value = nextRepo;
-    closeSearchSelect("repo");
+    var currentRepos = getSelectedRepos(state.config);
+    var nextRepos = toggleRepoSelection(currentRepos, value);
+    var currentKey = currentRepos.join(",");
+    var nextKey = nextRepos.join(",");
+    els.repoSelect.value = nextKey;
 
-    if (nextRepo === state.config.repo) {
+    if (nextKey === currentKey) {
       syncShareUrlParams(state.config);
       renderRepoOptions();
       return;
     }
 
     state.config = readForm();
-    state.config.repo = nextRepo;
+    state.config.repos = nextRepos;
+    state.config.reviewerFilter = "all";
+    state.boardSearch = "";
+    els.boardSearchInput.value = "";
+    state.pulls = [];
+    state.lastUpdated = null;
+    saveConfig(state.config);
+    render();
+    refreshDashboard();
+  }
+
+  function applyRepoPreset(presetId) {
+    var preset = getRepoPresetOptions().find(function (candidate) {
+      return candidate.id === presetId;
+    });
+    if (!preset || !preset.repos.length) {
+      return;
+    }
+
+    var nextRepos = normalizeRepoList(preset.repos);
+    var currentRepos = getSelectedRepos(state.config);
+    var currentKey = currentRepos.join(",");
+    var nextKey = nextRepos.join(",");
+    els.repoSelect.value = nextKey;
+
+    if (nextKey === currentKey) {
+      renderRepoOptions();
+      return;
+    }
+
+    state.config = readForm();
+    state.config.repos = nextRepos;
     state.config.reviewerFilter = "all";
     state.boardSearch = "";
     els.boardSearchInput.value = "";
@@ -432,7 +470,7 @@
   }
 
   function applyUrlConfigOverrides(config) {
-    var repoFromUrl = getRepoFromUrl();
+    var reposFromUrl = getReposFromUrl();
     var targetFromUrl = getUrlParam("target");
     var statusFromUrl = getUrlParam("status");
     var reviewNeedFromUrl = getUrlParam("review");
@@ -461,7 +499,7 @@
     }
 
     return {
-      repo: repoFromUrl || cleanRepoPart(config.repo || defaults.repo) || defaults.repo,
+      repos: reposFromUrl.length ? reposFromUrl : getSelectedRepos(config),
       reviewerFilter: targetFromUrl !== null ? normalizeFilterValue(targetFromUrl) : normalizeFilterValue(config.reviewerFilter),
       statusFilter: statusFilter,
       reviewNeedFilter: reviewNeedFromUrl !== null ? normalizeReviewNeedFilter(reviewNeedFromUrl) : normalizeReviewNeedFilter(config.reviewNeedFilter),
@@ -486,15 +524,30 @@
     return cleanRepoPart(getUrlParam("repo") || getUrlParam("repository") || "");
   }
 
+  function getReposFromUrl() {
+    var explicit = getUrlParam("repos");
+    if (explicit !== null) {
+      return normalizeRepoList(explicit.split(","));
+    }
+    var legacy = getRepoFromUrl();
+    return legacy ? [legacy] : [];
+  }
+
   function syncShareUrlParams(config) {
     try {
       var url = new URL(window.location.href);
-      var cleanRepo = cleanRepoPart(config.repo) || defaults.repo;
+      var repos = getSelectedRepos(config);
       setOptionalUrlParam(url, "target", normalizeFilterValue(config.reviewerFilter), "all");
       setOptionalUrlParam(url, "status", normalizeStatusFilter(config.statusFilter), "all");
       setOptionalUrlParam(url, "review", normalizeReviewNeedFilter(config.reviewNeedFilter), "all");
       setOptionalUrlParam(url, "age", normalizeAgeFilter(config.ageFilter), "all");
-      url.searchParams.set("repo", cleanRepo);
+      if (repos.length === 1) {
+        url.searchParams.set("repo", repos[0]);
+        url.searchParams.delete("repos");
+      } else {
+        url.searchParams.set("repos", repos.join(","));
+        url.searchParams.delete("repo");
+      }
       url.searchParams.set("sort", normalizeSortMode(config.sortMode));
       url.searchParams.set("drafts", config.hideDrafts === false ? "show" : "hide");
       url.searchParams.delete("repository");
@@ -574,7 +627,7 @@
 
   function readForm() {
     return {
-      repo: resolveRepoValue(els.repoSelect.value),
+      repos: parseRepoInputValue(els.repoSelect.value),
       reviewerFilter: normalizeFilterValue(els.reviewerFilterSelect.value || state.config.reviewerFilter),
       statusFilter: normalizeStatusFilter(els.statusFilterSelect.value || state.config.statusFilter),
       reviewNeedFilter: normalizeReviewNeedFilter(els.reviewNeedSelect.value || state.config.reviewNeedFilter),
@@ -587,11 +640,71 @@
   }
 
   function resolveRepoValue(value) {
-    var cleaned = cleanRepoPart(value) || defaults.repo;
+    var cleaned = cleanRepoPart(value) || defaults.repos[0];
     var match = state.repos.find(function (repo) {
       return String(repo.name || "").toLowerCase() === cleaned.toLowerCase();
     });
     return match && match.name ? match.name : cleaned;
+  }
+
+  function parseRepoInputValue(value) {
+    return normalizeRepoList(String(value || "").split(","));
+  }
+
+  function getSelectedRepos(config) {
+    var list = normalizeRepoList(
+      Array.isArray(config && config.repos)
+        ? config.repos
+        : [config && config.repo]
+    );
+    return list.length ? list : defaults.repos.slice();
+  }
+
+  function normalizeRepoList(values) {
+    var seen = new Set();
+    var repos = [];
+    values.forEach(function (value) {
+      var resolved = resolveRepoName(value);
+      var key = resolved.toLowerCase();
+      if (!resolved || seen.has(key)) {
+        return;
+      }
+      seen.add(key);
+      repos.push(resolved);
+    });
+    return repos;
+  }
+
+  function resolveRepoName(value) {
+    var cleaned = cleanRepoPart(value);
+    if (!cleaned) {
+      return "";
+    }
+    var repoList = state && Array.isArray(state.repos) ? state.repos : [];
+    var match = repoList.find(function (repo) {
+      return String(repo.name || "").toLowerCase() === cleaned.toLowerCase();
+    });
+    return match && match.name ? match.name : cleaned;
+  }
+
+  function toggleRepoSelection(currentRepos, value) {
+    var resolved = resolveRepoName(value);
+    if (!resolved) {
+      return currentRepos;
+    }
+    var key = resolved.toLowerCase();
+    var hasRepo = currentRepos.some(function (repo) {
+      return repo.toLowerCase() === key;
+    });
+    if (hasRepo) {
+      if (currentRepos.length === 1) {
+        return currentRepos;
+      }
+      return currentRepos.filter(function (repo) {
+        return repo.toLowerCase() !== key;
+      });
+    }
+    return currentRepos.concat([resolved]);
   }
 
   function cleanRepoPart(value) {
@@ -822,12 +935,20 @@
   }
 
   async function fetchOpenPulls(config, token, viewer) {
+    var repos = getSelectedRepos(config);
+    var repoPullSets = await mapWithConcurrency(repos, 4, function (repo) {
+      return fetchRepoPulls(repo, token, viewer);
+    });
+    return repoPullSets.flat();
+  }
+
+  async function fetchRepoPulls(repo, token, viewer) {
     var pulls = [];
     var page = 1;
     var headers = buildGitHubHeaders(token);
 
     while (true) {
-      var url = new URL("https://api.github.com/repos/" + encodeURIComponent(ORG_OWNER) + "/" + encodeURIComponent(config.repo) + "/pulls");
+      var url = new URL("https://api.github.com/repos/" + encodeURIComponent(ORG_OWNER) + "/" + encodeURIComponent(repo) + "/pulls");
       url.searchParams.set("state", "open");
       url.searchParams.set("per_page", "100");
       url.searchParams.set("page", String(page));
@@ -839,7 +960,7 @@
 
       var payload = await parseResponse(response);
       if (!response.ok) {
-        throw new Error(buildGitHubError(response, payload, config.repo));
+        throw new Error(buildGitHubError(response, payload, repo));
       }
 
       pulls = pulls.concat(payload);
@@ -849,29 +970,30 @@
       page += 1;
     }
 
-    return hydratePullReviewState(pulls, config, token, viewer);
+    return hydratePullReviewState(pulls, repo, token, viewer);
   }
 
-  async function hydratePullReviewState(pulls, config, token, viewer) {
+  async function hydratePullReviewState(pulls, repo, token, viewer) {
     var headers = buildGitHubHeaders(token);
     return mapWithConcurrency(pulls, 6, async function (pull) {
       var reviewData = await Promise.all([
-        fetchPullReviews(config.repo, pull.number, headers),
-        fetchPullIssue(config.repo, pull.number, headers).catch(function () {
+        fetchPullReviews(repo, pull.number, headers),
+        fetchPullIssue(repo, pull.number, headers).catch(function () {
           return {};
         })
       ]);
       var issueCommentCount = Number((reviewData[1] && reviewData[1].comments) || pull.comments || 0);
       var reviewCommentCount = Number(pull.review_comments || 0);
       var commentData = await Promise.all([
-        viewer && issueCommentCount > 0 ? fetchIssueComments(config.repo, pull.number, headers).catch(function () {
+        viewer && issueCommentCount > 0 ? fetchIssueComments(repo, pull.number, headers).catch(function () {
           return [];
         }) : Promise.resolve([]),
-        viewer && reviewCommentCount > 0 ? fetchPullReviewComments(config.repo, pull.number, headers).catch(function () {
+        viewer && reviewCommentCount > 0 ? fetchPullReviewComments(repo, pull.number, headers).catch(function () {
           return [];
         }) : Promise.resolve([])
       ]);
       return Object.assign({}, pull, {
+        repo_name: repo,
         review_state: buildPullReviewState(pull, reviewData[0], reviewData[1], commentData[0], commentData[1], viewer)
       });
     });
@@ -1205,6 +1327,9 @@
 
     appendMetaPart("", state.pulls.length, " open PRs");
     appendMetaPart("Updated ", formatClock(state.lastUpdated), "");
+    if (getSelectedRepos(state.config).length > 1) {
+      appendMetaPart("Repos ", formatRepoMetaLabel(getSelectedRepos(state.config)), "");
+    }
     if (model.selectedFilter !== "all") {
       appendMetaPart("Filtered to ", getFilterLabel(model.selectedFilter, model), "");
     }
@@ -1297,9 +1422,10 @@
   }
 
   function renderRepoOptions() {
-    var selected = cleanRepoPart(state.config.repo) || defaults.repo;
-    els.repoSelect.value = selected;
-    els.repoSelectLabel.textContent = selected;
+    var selectedRepos = getSelectedRepos(state.config);
+    els.repoSelect.value = selectedRepos.join(",");
+    els.repoSelectLabel.textContent = formatSelectedRepoLabel(selectedRepos);
+    els.repoSelectButton.title = selectedRepos.join(", ");
     renderRepoMenuOptions();
 
     if (state.reposLoading) {
@@ -1310,23 +1436,34 @@
       els.repoPickerHint.title = state.reposError;
     } else {
       els.repoPickerHint.textContent = state.repos.length
-        ? String(state.repos.length) + " repos in " + ORG_OWNER
+        ? String(state.repos.length) + " repos in " + ORG_OWNER + getRepoSelectionHintSuffix(selectedRepos)
         : "";
-      els.repoPickerHint.title = "";
+      els.repoPickerHint.title = getRepoSelectionHintTitle(selectedRepos);
     }
   }
 
   function renderRepoMenuOptions() {
     var options = getRepoMenuOptions();
+    var presets = getRepoPresetOptions();
     var query = els.repoSearchInput.value.trim().toLowerCase();
-    var selected = cleanRepoPart(state.config.repo) || defaults.repo;
+    var selected = new Set(getSelectedRepos(state.config).map(function (repo) {
+      return repo.toLowerCase();
+    }));
     var matches = options.filter(function (option) {
       return !query || option.value.toLowerCase().indexOf(query) >= 0 || option.label.toLowerCase().indexOf(query) >= 0;
     });
     var fragment = document.createDocumentFragment();
 
+    if (!query && presets.length) {
+      fragment.appendChild(createSearchSelectGroup("Presets"));
+      presets.forEach(function (preset) {
+        fragment.appendChild(createRepoPresetOption(preset, isSameRepoSelection(selected, preset.repos)));
+      });
+      fragment.appendChild(createSearchSelectGroup("Repositories"));
+    }
+
     matches.forEach(function (option) {
-      fragment.appendChild(createSearchSelectOption(option.value, option.label, option.value === selected));
+      fragment.appendChild(createRepoSearchSelectOption(option.value, option.label, selected.has(option.value.toLowerCase())));
     });
 
     if (!matches.length) {
@@ -1337,11 +1474,13 @@
   }
 
   function getRepoMenuOptions() {
-    var selected = cleanRepoPart(state.config.repo) || defaults.repo;
+    var selectedRepos = getSelectedRepos(state.config);
     var seen = new Set();
     var options = [];
 
-    addRepoOption({ name: selected });
+    selectedRepos.forEach(function (repo) {
+      addRepoOption({ name: repo });
+    });
     state.repos.forEach(addRepoOption);
     return options;
 
@@ -1357,6 +1496,62 @@
         label: formatRepoOption(repo)
       });
     }
+  }
+
+  function formatSelectedRepoLabel(repos) {
+    if (!repos.length) {
+      return defaults.repos[0];
+    }
+    return repos.join(", ");
+  }
+
+  function formatRepoMetaLabel(repos) {
+    return repos.join(", ");
+  }
+
+  function getRepoSelectionHintSuffix(repos) {
+    var suffix = repos.length > 1 ? " · " + String(repos.length) + " selected" : "";
+    if (repos.length > 3 && !loadToken()) {
+      suffix += " · PAT recommended";
+    }
+    return suffix;
+  }
+
+  function getRepoSelectionHintTitle(repos) {
+    if (repos.length > 3 && !loadToken()) {
+      return "GitHub token recommended when combining many repos to avoid rate limits and missing team/private data.";
+    }
+    return "";
+  }
+
+  function getRepoPresetOptions() {
+    var available = new Set(state.repos.map(function (repo) {
+      return String(repo.name || "").toLowerCase();
+    }));
+    var presets = [
+      { id: "core", label: "Core", repos: ["cowswap"] },
+      { id: "core-sdk", label: "Core + SDK", repos: ["cowswap", "cow-sdk"] },
+      { id: "frontend-stack", label: "Frontend stack", repos: ["cowswap", "frontend", "cow-sdk", "bff"] },
+      { id: "side-repos", label: "Side repos", repos: ["frontend", "cow-sdk", "bff"] }
+    ];
+
+    return presets.map(function (preset) {
+      var repos = preset.repos.filter(function (repo) {
+        return available.has(repo.toLowerCase()) || repo.toLowerCase() === "cowswap";
+      });
+      return Object.assign({}, preset, { repos: repos });
+    }).filter(function (preset) {
+      return preset.repos.length > 0;
+    });
+  }
+
+  function isSameRepoSelection(selectedSet, repos) {
+    if (selectedSet.size !== repos.length) {
+      return false;
+    }
+    return repos.every(function (repo) {
+      return selectedSet.has(repo.toLowerCase());
+    });
   }
 
   function formatRepoOption(repo) {
@@ -1398,6 +1593,7 @@
     var pullTeamMatches = new Map();
 
     modelPulls.forEach(function (pull) {
+      var pullKey = getPullKey(pull);
       getReviewers(pull).forEach(function (reviewer) {
         var reviewerKey = reviewer.login.toLowerCase();
         reviewerByLogin.set(reviewerKey, reviewer);
@@ -1413,7 +1609,7 @@
         teamBySlug.set(teamKey, team);
         teamCounts.set(teamKey, (teamCounts.get(teamKey) || 0) + 1);
       });
-      pullTeamMatches.set(pull.number, requestedTeams);
+      pullTeamMatches.set(pullKey, requestedTeams);
     });
 
     var reviewerOptions = Array.from(reviewerByLogin.values()).sort(function (a, b) {
@@ -1425,7 +1621,7 @@
 
     var noTeamReviewer = modelPulls.filter(function (pull) {
       var hasPerson = getReviewers(pull).length > 0;
-      var hasTeam = pullTeamMatches.get(pull.number).length > 0;
+      var hasTeam = (pullTeamMatches.get(getPullKey(pull)) || []).length > 0;
       return !hasPerson && !hasTeam;
     });
 
@@ -1435,7 +1631,7 @@
     var lanes = buildLanesForFilter(selectedFilter, visiblePulls, reviewerOptions, reviewerByLogin, teamOptions, pullTeamMatches, visibleNoTeamReviewer, selectedSort);
 
     var assignmentCount = modelPulls.reduce(function (total, pull) {
-      return total + getReviewers(pull).length + pullTeamMatches.get(pull.number).length;
+      return total + getReviewers(pull).length + (pullTeamMatches.get(getPullKey(pull)) || []).length;
     }, 0);
     var agingPulls = modelPulls.filter(isAgingPull);
     var oldestAgingDays = getOldestPullAgeDays(agingPulls);
@@ -1483,7 +1679,7 @@
       var lanes = teamLanes.slice();
 
       var unknownTeamItems = pulls.filter(function (pull) {
-        return pullTeamMatches.get(pull.number).some(function (team) {
+        return (pullTeamMatches.get(getPullKey(pull)) || []).some(function (team) {
           var slug = String(team.slug || "").toLowerCase();
           return !slug || !knownTeamSlugs.has(slug);
         });
@@ -1538,7 +1734,7 @@
       return String(candidate.slug || "").toLowerCase() === key;
     });
     var items = pulls.filter(function (pull) {
-      return pullTeamMatches.get(pull.number).some(function (candidate) {
+      return (pullTeamMatches.get(getPullKey(pull)) || []).some(function (candidate) {
         return String(candidate.slug || "").toLowerCase() === key;
       });
     });
@@ -1708,6 +1904,25 @@
     var text = document.createElement("span");
     text.textContent = label;
     button.appendChild(text);
+    return button;
+  }
+
+  function createRepoSearchSelectOption(value, label, selected) {
+    var button = createSearchSelectOption(value, label, selected);
+    button.classList.add("search-select-option-multi");
+
+    var indicator = document.createElement("span");
+    indicator.className = "search-select-option-indicator";
+    indicator.setAttribute("aria-hidden", "true");
+    indicator.textContent = selected ? "x" : "";
+
+    button.insertBefore(indicator, button.firstChild);
+    return button;
+  }
+
+  function createRepoPresetOption(preset, selected) {
+    var button = createSearchSelectOption(preset.id, preset.label + " (" + preset.repos.join(", ") + ")", selected);
+    button.setAttribute("data-preset", preset.id);
     return button;
   }
 
@@ -1959,7 +2174,7 @@
       body.appendChild(empty);
     } else {
       lane.items.forEach(function (pull) {
-        body.appendChild(createPullCard(pull, teamMatches.get(pull.number) || []));
+        body.appendChild(createPullCard(pull, teamMatches.get(getPullKey(pull)) || []));
       });
     }
     section.appendChild(body);
@@ -2023,6 +2238,10 @@
       if (isStale) {
         card.classList.add("is-stale");
       }
+    }
+
+    if (shouldShowRepoTag()) {
+      card.appendChild(createPullRepoBand(pull));
     }
 
     var meta = document.createElement("div");
@@ -2094,6 +2313,13 @@
     card.appendChild(createPullTooltip(pull, teamMatches));
 
     return card;
+  }
+
+  function createPullRepoBand(pull) {
+    var band = document.createElement("div");
+    band.className = "pr-repo-band";
+    band.textContent = getPullRepoName(pull);
+    return band;
   }
 
   function createCommentSummary(pull) {
@@ -2303,10 +2529,15 @@
 
   function getPullRepoName(pull) {
     return (
+      pull.repo_name ||
       pull.base &&
       pull.base.repo &&
       pull.base.repo.name
-    ) || state.config.repo || "unknown";
+    ) || getSelectedRepos(state.config)[0] || "unknown";
+  }
+
+  function shouldShowRepoTag() {
+    return getSelectedRepos(state.config).length > 1;
   }
 
   function formatBranchDetail(pull) {
@@ -2402,7 +2633,7 @@
     }
     var terms = cleanQuery.split(" ").filter(Boolean);
     return pulls.filter(function (pull) {
-      var haystack = getPullSearchText(pull, pullTeamMatches.get(pull.number) || []);
+      var haystack = getPullSearchText(pull, pullTeamMatches.get(getPullKey(pull)) || []);
       return terms.every(function (term) {
         return haystack.indexOf(term) >= 0;
       });
@@ -2415,6 +2646,8 @@
       "#" + String(pull.number || ""),
       pull.title || "",
       pull.body || "",
+      getPullRepoName(pull),
+      ORG_OWNER + "/" + getPullRepoName(pull),
       pull.user && pull.user.login ? pull.user.login : "",
       pull.head && pull.head.ref ? pull.head.ref : "",
       pull.base && pull.base.ref ? pull.base.ref : ""
@@ -2447,6 +2680,10 @@
     }
 
     return parts.join(" ").toLowerCase();
+  }
+
+  function getPullKey(pull) {
+    return getPullRepoName(pull) + "#" + String(pull.number || "");
   }
 
   function buildStatusCounts(pulls) {
